@@ -12,7 +12,7 @@
 
            
 
-/*ÊôĞÔÎ»ÑÚÂë*/
+/*å±æ€§ä½æ©ç */
 #define ATTR_READONLY 0x01
 #define ATTR_HIDDEN 0x02
 #define ATTR_SYSTEM 0x04
@@ -20,12 +20,12 @@
 #define ATTR_SUBDIR 0x10
 #define ATTR_ARCHIVE 0x20
 
-/*Ê±¼äÑÚÂë 5£º6£º5 */
+/*æ—¶é—´æ©ç  5ï¼š6ï¼š5 */
 #define MASK_HOUR 0xf800 
 #define MASK_MIN 0x07e0
 #define MASK_SEC 0x001f
 
-/*ÈÕÆÚÑÚÂë*/
+/*æ—¥æœŸæ©ç */
 #define MASK_YEAR 0xfe00
 #define MASK_MONTH 0x01e0
 #define MASK_DAY 0x001f
@@ -46,15 +46,15 @@ struct BootDescriptor_t{
 };
 
 struct Entry{
-	unsigned char short_name[12];   /*×Ö½Ú0-10£¬11×Ö½ÚµÄ¶ÌÎÄ¼şÃû*/
-	unsigned char long_name[27];    /*Î´Ê¹ÓÃ£¬26×Ö½ÚµÄ³¤ÎÄ¼şÃû*/
-	unsigned short year,month,day;  /*22-23×Ö½Ú*/
-	unsigned short hour,min,sec;    /*24-25×Ö½Ú*/
-	unsigned short FirstCluster;    /*26-27×Ö½Ú*/
-	unsigned int size;              /*28-31×Ö½Ú*/
-	/*ÊôĞÔÖµ                        11×Ö½Ú
+	unsigned char short_name[12];   /*å­—èŠ‚0-10ï¼Œ11å­—èŠ‚çš„çŸ­æ–‡ä»¶å*/
+	unsigned char long_name[27];    /*æœªä½¿ç”¨ï¼Œ26å­—èŠ‚çš„é•¿æ–‡ä»¶å*/
+	unsigned short year,month,day;  /*22-23å­—èŠ‚*/
+	unsigned short hour,min,sec;    /*24-25å­—èŠ‚*/
+	unsigned short FirstCluster;    /*26-27å­—èŠ‚*/
+	unsigned int size;              /*28-31å­—èŠ‚*/
+	/*å±æ€§å€¼                        11å­—èŠ‚
 	*7  6  5  4  3  2  1  0
-	*N  N  A  D  V  S  H  R         NÎ´Ê¹ÓÃ
+	*N  N  A  D  V  S  H  R         Næœªä½¿ç”¨
 	*/
 
 	unsigned char readonly:1;
@@ -68,7 +68,7 @@ struct Entry{
 int fd_ls();
 int fd_cd(char *dir);
 int fd_df(char *file_name);
-int fd_cf(char *file_name,int size);
+int fd_cf(char *file_name,int size,int is_dir);
 
 void findDate(unsigned short *year,
 			  unsigned short *month,
@@ -92,7 +92,7 @@ void ClearFatCluster(unsigned short cluster);
 int fd;
 struct BootDescriptor_t bdptor;
 struct Entry *curdir = NULL;
-int dirno = 0;/*´ú±íÄ¿Â¼µÄ²ãÊı*/
+int dirno = 0;/*ä»£è¡¨ç›®å½•çš„å±‚æ•°*/
 struct Entry* fatherdir[10];
 
 unsigned char fatbuf[512*250];  

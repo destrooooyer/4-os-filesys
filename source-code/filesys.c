@@ -13,30 +13,30 @@
 #define RevWord(lowest,lower,higher,highest) ((highest)<< 24|(higher)<<16|(lower)<<8|lowest) 
 
 /*
-*¹¦ÄÜ£º´òÓ¡Æô¶¯Ïî¼ÇÂ¼
+*åŠŸèƒ½ï¼šæ‰“å°å¯åŠ¨é¡¹è®°å½•
 */
 void ScanBootSector()
 {
 	unsigned char buf[SECTOR_SIZE];
-	int ret,i;
+	int ret, i;
 
-	if((ret = read(fd,buf,SECTOR_SIZE))<0)
+	if ((ret = read(fd, buf, SECTOR_SIZE)) < 0)		//fdæ˜¯mainå¼€å§‹æ‰“å¼€çš„æ–‡ä»¶ "/dev/sdb1" 
 		perror("read boot sector failed");
-	for(i = 0; i < 8; i++)
-		bdptor.Oem_name[i] = buf[i+0x03];
+	for (i = 0; i < 8; i++)
+		bdptor.Oem_name[i] = buf[i + 0x03];			//struct BootDescriptor_t bdptor
 	bdptor.Oem_name[i] = '\0';
 
-	bdptor.BytesPerSector = RevByte(buf[0x0b],buf[0x0c]);
+	bdptor.BytesPerSector = RevByte(buf[0x0b], buf[0x0c]);	//RevByte: ((high)<<8|(low))
 	bdptor.SectorsPerCluster = buf[0x0d];
-	bdptor.ReservedSectors = RevByte(buf[0x0e],buf[0x0f]);
+	bdptor.ReservedSectors = RevByte(buf[0x0e], buf[0x0f]);
 	bdptor.FATs = buf[0x10];
-	bdptor.RootDirEntries = RevByte(buf[0x11],buf[0x12]);    
-	bdptor.LogicSectors = RevByte(buf[0x13],buf[0x14]);
+	bdptor.RootDirEntries = RevByte(buf[0x11], buf[0x12]);
+	bdptor.LogicSectors = RevByte(buf[0x13], buf[0x14]);
 	bdptor.MediaType = buf[0x15];
-	bdptor.SectorsPerFAT = RevByte( buf[0x16],buf[0x17] );
-	bdptor.SectorsPerTrack = RevByte(buf[0x18],buf[0x19]);
-	bdptor.Heads = RevByte(buf[0x1a],buf[0x1b]);
-	bdptor.HiddenSectors = RevByte(buf[0x1c],buf[0x1d]);
+	bdptor.SectorsPerFAT = RevByte(buf[0x16], buf[0x17]);
+	bdptor.SectorsPerTrack = RevByte(buf[0x18], buf[0x19]);
+	bdptor.Heads = RevByte(buf[0x1a], buf[0x1b]);
+	bdptor.HiddenSectors = RevByte(buf[0x1c], buf[0x1d]);
 
 
 	printf("Oem_name \t\t%s\n"
@@ -65,139 +65,140 @@ void ScanBootSector()
 		bdptor.HiddenSectors);
 }
 
-/*ÈÕÆÚ*/
+/*æ—¥æœŸ*/
 void findDate(unsigned short *year,
-			  unsigned short *month,
-			  unsigned short *day,
-			  unsigned char info[2])
+	unsigned short *month,
+	unsigned short *day,
+	unsigned char info[2])
 {
 	int date;
-	date = RevByte(info[0],info[1]);
+	date = RevByte(info[0], info[1]);
 
-	*year = ((date & MASK_YEAR)>> 9 )+1980;
-	*month = ((date & MASK_MONTH)>> 5);
+	*year = ((date & MASK_YEAR) >> 9) + 1980;
+	*month = ((date & MASK_MONTH) >> 5);
 	*day = (date & MASK_DAY);
 }
 
-/*Ê±¼ä*/
+/*æ—¶é—´*/
 void findTime(unsigned short *hour,
-			  unsigned short *min,
-			  unsigned short *sec,
-			  unsigned char info[2])
+	unsigned short *min,
+	unsigned short *sec,
+	unsigned char info[2])
 {
 	int time;
-	time = RevByte(info[0],info[1]);
+	time = RevByte(info[0], info[1]);
 
-	*hour = ((time & MASK_HOUR )>>11);
-	*min = (time & MASK_MIN)>> 5;
+	*hour = ((time & MASK_HOUR) >> 11);
+	*min = (time & MASK_MIN) >> 5;
 	*sec = (time & MASK_SEC) * 2;
 }
 
 /*
-*ÎÄ¼şÃû¸ñÊ½»¯£¬±ãÓÚ±È½Ï
+*æ–‡ä»¶åæ ¼å¼åŒ–ï¼Œä¾¿äºæ¯”è¾ƒ
 */
 void FileNameFormat(unsigned char *name)
 {
 	unsigned char *p = name;
-	while(*p!='\0')
+	while (*p != '\0')
 		p++;
 	p--;
-	while(*p==' ')
+	while (*p == ' ')
 		p--;
 	p++;
 	*p = '\0';
 }
 
-/*²ÎÊı£ºentry£¬ÀàĞÍ£ºstruct Entry*
-*·µ»ØÖµ£º³É¹¦£¬Ôò·µ»ØÆ«ÒÆÖµ£»Ê§°Ü£º·µ»Ø¸ºÖµ
-*¹¦ÄÜ£º´Ó¸ùÄ¿Â¼»òÎÄ¼ş´ØÖĞµÃµ½ÎÄ¼ş±íÏî
+/*å‚æ•°ï¼šentryï¼Œç±»å‹ï¼šstruct Entry*
+*è¿”å›å€¼ï¼šæˆåŠŸï¼Œåˆ™è¿”å›åç§»å€¼ï¼›å¤±è´¥ï¼šè¿”å›è´Ÿå€¼
+*åŠŸèƒ½ï¼šä»æ ¹ç›®å½•æˆ–æ–‡ä»¶ç°‡ä¸­å¾—åˆ°æ–‡ä»¶è¡¨é¡¹
 */
 int GetEntry(struct Entry *pentry)
 {
-	int ret,i;
+	int ret, i;
 	int count = 0;
 	unsigned char buf[DIR_ENTRY_SIZE], info[2];
 
-	/*¶ÁÒ»¸öÄ¿Â¼±íÏî£¬¼´32×Ö½Ú*/
-	if( (ret = read(fd,buf,DIR_ENTRY_SIZE))<0)
+	/*è¯»ä¸€ä¸ªç›®å½•è¡¨é¡¹ï¼Œå³32å­—èŠ‚*/
+	if ((ret = read(fd, buf, DIR_ENTRY_SIZE)) < 0)
 		perror("read entry failed");
 	count += ret;
 
-	if(buf[0]==0xe5 || buf[0]== 0x00)
-		return -1*count;
+	if (buf[0] == 0xe5 || buf[0] == 0x00)
+		return -1 * count;
 	else
 	{
-		/*³¤ÎÄ¼şÃû£¬ºöÂÔµô*/
-		while (buf[11]== 0x0f) 
+		/*é•¿æ–‡ä»¶åï¼Œå¿½ç•¥æ‰*/
+		while (buf[11] == 0x0f)
 		{
-			if((ret = read(fd,buf,DIR_ENTRY_SIZE))<0)
+			if ((ret = read(fd, buf, DIR_ENTRY_SIZE)) < 0)
 				perror("read root dir failed");
 			count += ret;
 		}
 
-		/*ÃüÃû¸ñÊ½»¯£¬Ö÷Òå½áÎ²µÄ'\0'*/
-		for (i=0 ;i<=10;i++)
+		/*å‘½åæ ¼å¼åŒ–ï¼Œä¸»ä¹‰ç»“å°¾çš„'\0'*/
+		for (i = 0; i <= 10; i++)
 			pentry->short_name[i] = buf[i];
 		pentry->short_name[i] = '\0';
 
-		FileNameFormat(pentry->short_name); 
+		FileNameFormat(pentry->short_name);
 
 
 
-		info[0]=buf[22];
-		info[1]=buf[23];
-		findTime(&(pentry->hour),&(pentry->min),&(pentry->sec),info);  
+		info[0] = buf[22];
+		info[1] = buf[23];
+		findTime(&(pentry->hour), &(pentry->min), &(pentry->sec), info);
 
-		info[0]=buf[24];
-		info[1]=buf[25];
-		findDate(&(pentry->year),&(pentry->month),&(pentry->day),info);
+		info[0] = buf[24];
+		info[1] = buf[25];
+		findDate(&(pentry->year), &(pentry->month), &(pentry->day), info);
 
-		pentry->FirstCluster = RevByte(buf[26],buf[27]);
-		pentry->size = RevWord(buf[28],buf[29],buf[30],buf[31]);
+		pentry->FirstCluster = RevByte(buf[26], buf[27]);
+		pentry->size = RevWord(buf[28], buf[29], buf[30], buf[31]);
 
-		pentry->readonly = (buf[11] & ATTR_READONLY) ?1:0;
-		pentry->hidden = (buf[11] & ATTR_HIDDEN) ?1:0;
-		pentry->system = (buf[11] & ATTR_SYSTEM) ?1:0;
-		pentry->vlabel = (buf[11] & ATTR_VLABEL) ?1:0;
-		pentry->subdir = (buf[11] & ATTR_SUBDIR) ?1:0;
-		pentry->archive = (buf[11] & ATTR_ARCHIVE) ?1:0;
+		pentry->readonly = (buf[11] & ATTR_READONLY) ? 1 : 0;
+		pentry->hidden = (buf[11] & ATTR_HIDDEN) ? 1 : 0;
+		pentry->system = (buf[11] & ATTR_SYSTEM) ? 1 : 0;
+		pentry->vlabel = (buf[11] & ATTR_VLABEL) ? 1 : 0;
+		pentry->subdir = (buf[11] & ATTR_SUBDIR) ? 1 : 0;
+		pentry->archive = (buf[11] & ATTR_ARCHIVE) ? 1 : 0;
 
 		return count;
 	}
 }
 
 /*
-*¹¦ÄÜ£ºÏÔÊ¾µ±Ç°Ä¿Â¼µÄÄÚÈİ
-*·µ»ØÖµ£º1£¬³É¹¦£»-1£¬Ê§°Ü
+*åŠŸèƒ½ï¼šæ˜¾ç¤ºå½“å‰ç›®å½•çš„å†…å®¹
+*è¿”å›å€¼ï¼š1ï¼ŒæˆåŠŸï¼›-1ï¼Œå¤±è´¥
 */
 int fd_ls()
 {
-	int ret, offset,cluster_addr;
+	int ret, offset, cluster_addr;
 	struct Entry entry;
 	unsigned char buf[DIR_ENTRY_SIZE];
-	if( (ret = read(fd,buf,DIR_ENTRY_SIZE))<0)
+	if ((ret = read(fd, buf, DIR_ENTRY_SIZE)) < 0)
 		perror("read entry failed");
-	if(curdir==NULL)
+
+	if (curdir == NULL)
 		printf("Root_dir\n");
 	else
-		printf("%s_dir\n",curdir->short_name);
+		printf("%s_dir\n", curdir->short_name);
 	printf("\tname\tdate\t\t time\t\tcluster\tsize\t\tattr\n");
 
-	if(curdir==NULL)  /*ÏÔÊ¾¸ùÄ¿Â¼Çø*/
+	if (curdir == NULL)  /*æ˜¾ç¤ºæ ¹ç›®å½•åŒº*/
 	{
-		/*½«fd¶¨Î»µ½¸ùÄ¿Â¼ÇøµÄÆğÊ¼µØÖ·*/
-		if((ret= lseek(fd,ROOTDIR_OFFSET,SEEK_SET))<0)
+		/*å°†fdå®šä½åˆ°æ ¹ç›®å½•åŒºçš„èµ·å§‹åœ°å€*/
+		if ((ret = lseek(fd, ROOTDIR_OFFSET, SEEK_SET)) < 0)
 			perror("lseek ROOTDIR_OFFSET failed");
 
 		offset = ROOTDIR_OFFSET;
 
-		/*´Ó¸ùÄ¿Â¼Çø¿ªÊ¼±éÀú£¬Ö±µ½Êı¾İÇøÆğÊ¼µØÖ·*/
-		while(offset < (DATA_OFFSET))
+		/*ä»æ ¹ç›®å½•åŒºå¼€å§‹éå†ï¼Œç›´åˆ°æ•°æ®åŒºèµ·å§‹åœ°å€*/
+		while (offset < (DATA_OFFSET))
 		{
 			ret = GetEntry(&entry);
 
 			offset += abs(ret);
-			if(ret > 0)
+			if (ret > 0)
 			{
 				printf("%12s\t"
 					"%d:%d:%d\t"
@@ -206,29 +207,29 @@ int fd_ls()
 					"%d\t\t"
 					"%s\n",
 					entry.short_name,
-					entry.year,entry.month,entry.day,
-					entry.hour,entry.min,entry.sec,
+					entry.year, entry.month, entry.day,
+					entry.hour, entry.min, entry.sec,
 					entry.FirstCluster,
 					entry.size,
-					(entry.subdir) ? "dir":"file");
+					(entry.subdir) ? "dir" : "file");
 			}
 		}
 	}
 
-	else /*ÏÔÊ¾×ÓÄ¿Â¼*/
+	else /*æ˜¾ç¤ºå­ç›®å½•*/
 	{
-		cluster_addr = DATA_OFFSET + (curdir->FirstCluster-2) * CLUSTER_SIZE ;
-		if((ret = lseek(fd,cluster_addr,SEEK_SET))<0)
+		cluster_addr = DATA_OFFSET + (curdir->FirstCluster - 2) * CLUSTER_SIZE;
+		if ((ret = lseek(fd, cluster_addr, SEEK_SET)) < 0)
 			perror("lseek cluster_addr failed");
 
 		offset = cluster_addr;
 
-		/*Ö»¶ÁÒ»´ØµÄÄÚÈİ*/
-		while(offset<cluster_addr +CLUSTER_SIZE)
+		/*åªè¯»ä¸€ç°‡çš„å†…å®¹*/
+		while (offset < cluster_addr + CLUSTER_SIZE)
 		{
 			ret = GetEntry(&entry);
 			offset += abs(ret);
-			if(ret > 0)
+			if (ret > 0)
 			{
 				printf("%12s\t"
 					"%d:%d:%d\t"
@@ -237,67 +238,66 @@ int fd_ls()
 					"%d\t\t"
 					"%s\n",
 					entry.short_name,
-					entry.year,entry.month,entry.day,
-					entry.hour,entry.min,entry.sec,
+					entry.year, entry.month, entry.day,
+					entry.hour, entry.min, entry.sec,
 					entry.FirstCluster,
 					entry.size,
-					(entry.subdir) ? "dir":"file");
+					(entry.subdir) ? "dir" : "file");
 			}
 		}
 	}
 	return 0;
-} 
+}
 
 
 /*
-*²ÎÊı£ºentryname ÀàĞÍ£ºchar
-£ºpentry    ÀàĞÍ£ºstruct Entry*
-£ºmode      ÀàĞÍ£ºint£¬mode=1£¬ÎªÄ¿Â¼±íÏî£»mode=0£¬ÎªÎÄ¼ş
-*·µ»ØÖµ£ºÆ«ÒÆÖµ´óÓÚ0£¬Ôò³É¹¦£»-1£¬ÔòÊ§°Ü
-*¹¦ÄÜ£ºËÑË÷µ±Ç°Ä¿Â¼£¬²éÕÒÎÄ¼ş»òÄ¿Â¼Ïî
+*å‚æ•°ï¼šentryname ç±»å‹ï¼šchar
+ï¼špentry    ç±»å‹ï¼šstruct Entry*
+ï¼šmode      ç±»å‹ï¼šintï¼Œmode=1ï¼Œä¸ºç›®å½•è¡¨é¡¹ï¼›mode=0ï¼Œä¸ºæ–‡ä»¶
+*è¿”å›å€¼ï¼šåç§»å€¼å¤§äº0ï¼Œåˆ™æˆåŠŸï¼›-1ï¼Œåˆ™å¤±è´¥
+*åŠŸèƒ½ï¼šæœç´¢å½“å‰ç›®å½•ï¼ŒæŸ¥æ‰¾æ–‡ä»¶æˆ–ç›®å½•é¡¹
 */
-int ScanEntry (char *entryname,struct Entry *pentry,int mode)
+int ScanEntry(char *entryname, struct Entry *pentry, int mode)
 {
-	int ret,offset,i;
+	int ret, offset, i;
 	int cluster_addr;
 	char uppername[80];
-	for(i=0;i< strlen(entryname);i++)
-		uppername[i]= toupper(entryname[i]);
-	uppername[i]= '\0';
-	/*É¨Ãè¸ùÄ¿Â¼*/
-	if(curdir ==NULL)  
+	for (i = 0; i < strlen(entryname); i++)
+		uppername[i] = toupper(entryname[i]);
+	uppername[i] = '\0';
+	/*æ‰«ææ ¹ç›®å½•*/
+	if (curdir == NULL)
 	{
-		if((ret = lseek(fd,ROOTDIR_OFFSET,SEEK_SET))<0)
-			perror ("lseek ROOTDIR_OFFSET failed");
+		if ((ret = lseek(fd, ROOTDIR_OFFSET, SEEK_SET)) < 0)
+			perror("lseek ROOTDIR_OFFSET failed");
 		offset = ROOTDIR_OFFSET;
 
 
-		while(offset<DATA_OFFSET)
+		while (offset < DATA_OFFSET)
 		{
 			ret = GetEntry(pentry);
-			offset +=abs(ret);
+			offset += abs(ret);
 
-			if(pentry->subdir == mode &&!strcmp((char*)pentry->short_name,uppername))
-
+			if (pentry->subdir == mode &&!strcmp((char*)pentry->short_name, uppername))
 				return offset;
 
 		}
 		return -1;
 	}
 
-	/*É¨Ãè×ÓÄ¿Â¼*/
-	else  
+	/*æ‰«æå­ç›®å½•*/
+	else
 	{
-		cluster_addr = DATA_OFFSET + (curdir->FirstCluster -2)*CLUSTER_SIZE;
-		if((ret = lseek(fd,cluster_addr,SEEK_SET))<0)
+		cluster_addr = DATA_OFFSET + (curdir->FirstCluster - 2)*CLUSTER_SIZE;
+		if ((ret = lseek(fd, cluster_addr, SEEK_SET)) < 0)
 			perror("lseek cluster_addr failed");
-		offset= cluster_addr;
+		offset = cluster_addr;
 
-		while(offset<cluster_addr + CLUSTER_SIZE)
+		while (offset < cluster_addr + CLUSTER_SIZE)
 		{
-			ret= GetEntry(pentry);
+			ret = GetEntry(pentry);
 			offset += abs(ret);
-			if(pentry->subdir == mode &&!strcmp((char*)pentry->short_name,uppername))
+			if (pentry->subdir == mode &&!strcmp((char*)pentry->short_name, uppername))
 				return offset;
 
 
@@ -310,47 +310,47 @@ int ScanEntry (char *entryname,struct Entry *pentry,int mode)
 
 
 /*
-*²ÎÊı£ºdir£¬ÀàĞÍ£ºchar
-*·µ»ØÖµ£º1£¬³É¹¦£»-1£¬Ê§°Ü
-*¹¦ÄÜ£º¸Ä±äÄ¿Â¼µ½¸¸Ä¿Â¼»ò×ÓÄ¿Â¼
+*å‚æ•°ï¼šdirï¼Œç±»å‹ï¼šchar
+*è¿”å›å€¼ï¼š1ï¼ŒæˆåŠŸï¼›-1ï¼Œå¤±è´¥
+*åŠŸèƒ½ï¼šæ”¹å˜ç›®å½•åˆ°çˆ¶ç›®å½•æˆ–å­ç›®å½•
 */
 int fd_cd(char *dir)
 {
 	struct Entry *pentry;
 	int ret;
 
-	if(!strcmp(dir,"."))
+	if (!strcmp(dir, "."))
 	{
 		return 1;
 	}
-	if(!strcmp(dir,"..") && curdir==NULL)
+	if (!strcmp(dir, "..") && curdir == NULL)
 		return 1;
-	/*·µ»ØÉÏÒ»¼¶Ä¿Â¼*/
-	if(!strcmp(dir,"..") && curdir!=NULL)
+	/*è¿”å›ä¸Šä¸€çº§ç›®å½•*/
+	if (!strcmp(dir, "..") && curdir != NULL)
 	{
 		curdir = fatherdir[dirno];
-		dirno--; 
+		dirno--;
 		return 1;
 	}
 	pentry = (struct Entry*)malloc(sizeof(struct Entry));
 
-	ret = ScanEntry(dir,pentry,1);
-	if(ret < 0)
+	ret = ScanEntry(dir, pentry, 1);
+	if (ret < 0)
 	{
 		printf("no such dir\n");
 		free(pentry);
 		return -1;
 	}
-	dirno ++;
+	dirno++;
 	fatherdir[dirno] = curdir;
 	curdir = pentry;
 	return 1;
 }
 
 /*
-*²ÎÊı£ºprev£¬ÀàĞÍ£ºunsigned char
-*·µ»ØÖµ£ºÏÂÒ»´Ø
-*ÔÚfat±íÖĞ»ñµÃÏÂÒ»´ØµÄÎ»ÖÃ
+*å‚æ•°ï¼šprevï¼Œç±»å‹ï¼šunsigned char
+*è¿”å›å€¼ï¼šä¸‹ä¸€ç°‡
+*åœ¨fatè¡¨ä¸­è·å¾—ä¸‹ä¸€ç°‡çš„ä½ç½®
 */
 unsigned short GetFatCluster(unsigned short prev)
 {
@@ -358,48 +358,48 @@ unsigned short GetFatCluster(unsigned short prev)
 	int index;
 
 	index = prev * 2;
-	next = RevByte(fatbuf[index],fatbuf[index+1]);
+	next = RevByte(fatbuf[index], fatbuf[index + 1]);
 
 	return next;
 }
 
 /*
-*²ÎÊı£ºcluster£¬ÀàĞÍ£ºunsigned short
-*·µ»ØÖµ£ºvoid
-*¹¦ÄÜ£ºÇå³ıfat±íÖĞµÄ´ØĞÅÏ¢
+*å‚æ•°ï¼šclusterï¼Œç±»å‹ï¼šunsigned short
+*è¿”å›å€¼ï¼švoid
+*åŠŸèƒ½ï¼šæ¸…é™¤fatè¡¨ä¸­çš„ç°‡ä¿¡æ¯
 */
 void ClearFatCluster(unsigned short cluster)
 {
 	int index;
 	index = cluster * 2;
 
-	fatbuf[index]=0x00;
-	fatbuf[index+1]=0x00;
+	fatbuf[index] = 0x00;
+	fatbuf[index + 1] = 0x00;
 
 }
 
 
 /*
-*½«¸Ä±äµÄfat±íÖµĞ´»Øfat±í
+*å°†æ”¹å˜çš„fatè¡¨å€¼å†™å›fatè¡¨
 */
 int WriteFat()
 {
-	if(lseek(fd,FAT_ONE_OFFSET,SEEK_SET)<0)
+	if (lseek(fd, FAT_ONE_OFFSET, SEEK_SET) < 0)
 	{
 		perror("lseek failed");
 		return -1;
 	}
-	if(write(fd,fatbuf,512*250)<0)
+	if (write(fd, fatbuf, 512 * 250) < 0)
 	{
 		perror("read failed");
 		return -1;
 	}
-	if(lseek(fd,FAT_TWO_OFFSET,SEEK_SET)<0)
+	if (lseek(fd, FAT_TWO_OFFSET, SEEK_SET) < 0)
 	{
 		perror("lseek failed");
 		return -1;
 	}
-	if((write(fd,fatbuf,512*250))<0)
+	if ((write(fd, fatbuf, 512 * 250)) < 0)
 	{
 		perror("read failed");
 		return -1;
@@ -408,16 +408,16 @@ int WriteFat()
 }
 
 /*
-*¶Áfat±íµÄĞÅÏ¢£¬´æÈëfatbuf[]ÖĞ
+*è¯»fatè¡¨çš„ä¿¡æ¯ï¼Œå­˜å…¥fatbuf[]ä¸­
 */
 int ReadFat()
 {
-	if(lseek(fd,FAT_ONE_OFFSET,SEEK_SET)<0)
+	if (lseek(fd, FAT_ONE_OFFSET, SEEK_SET) < 0)	//å°†fdçš„æ–‡ä»¶è¯»å†™æŒ‡é’ˆå˜ä¸ºä»æ–‡ä»¶å¤´å¼€å§‹ï¼ˆSEEK_SETï¼‰ç§»åŠ¨512çš„ä½ç½®
 	{
 		perror("lseek failed");
 		return -1;
 	}
-	if(read(fd,fatbuf,512*250)<0)
+	if (read(fd, fatbuf, 512 * 250) < 0)
 	{
 		perror("read failed");
 		return -1;
@@ -427,176 +427,188 @@ int ReadFat()
 
 
 /*
-*²ÎÊı£ºfilename£¬ÀàĞÍ£ºchar
-*·µ»ØÖµ£º1£¬³É¹¦£»-1£¬Ê§°Ü
-*¹¦ÄÜ;É¾³ıµ±Ç°Ä¿Â¼ÏÂµÄÎÄ¼ş
+*å‚æ•°ï¼šfilenameï¼Œç±»å‹ï¼šchar
+*è¿”å›å€¼ï¼š1ï¼ŒæˆåŠŸï¼›-1ï¼Œå¤±è´¥
+*åŠŸèƒ½;åˆ é™¤å½“å‰ç›®å½•ä¸‹çš„æ–‡ä»¶
 */
 int fd_df(char *filename)
 {
 	struct Entry *pentry;
 	int ret;
 	unsigned char c;
-	unsigned short seed,next;
+	unsigned short seed, next;
 
 	pentry = (struct Entry*)malloc(sizeof(struct Entry));
 
-	/*É¨Ãèµ±Ç°Ä¿Â¼²éÕÒÎÄ¼ş*/
-	ret = ScanEntry(filename,pentry,0);
-	if(ret<0)
+	/*æ‰«æå½“å‰ç›®å½•æŸ¥æ‰¾æ–‡ä»¶*/
+	ret = ScanEntry(filename, pentry, 0);
+	if (ret < 0)
 	{
 		printf("no such file\n");
 		free(pentry);
 		return -1;
 	}
 
-	/*Çå³ıfat±íÏî*/
+	/*æ¸…é™¤fatè¡¨é¡¹*/
 	seed = pentry->FirstCluster;
-	while((next = GetFatCluster(seed))!=0xffff)
+	while ((next = GetFatCluster(seed)) != 0xffff)
 	{
 		ClearFatCluster(seed);
 		seed = next;
 
 	}
 
-	ClearFatCluster( seed );
+	ClearFatCluster(seed);
 
-	/*Çå³ıÄ¿Â¼±íÏî*/
-	c=0xe5;
+	/*æ¸…é™¤ç›®å½•è¡¨é¡¹*/
+	c = 0xe5;
 
 
-	if(lseek(fd,ret-0x20,SEEK_SET)<0)
+	if (lseek(fd, ret - 0x20, SEEK_SET) < 0)
 		perror("lseek fd_df failed");
-	if(write(fd,&c,1)<0)
-		perror("write failed");  
+	if (write(fd, &c, 1) < 0)
+		perror("write failed");
 
 
-	if(lseek(fd,ret-0x40,SEEK_SET)<0)
+	if (lseek(fd, ret - 0x40, SEEK_SET) < 0)
 		perror("lseek fd_df failed");
-	if(write(fd,&c,1)<0)
+	if (write(fd, &c, 1) < 0)
 		perror("write failed");
 
 	free(pentry);
-	if(WriteFat()<0)
+	if (WriteFat() < 0)
 		exit(1);
 	return 1;
 }
 
 
 /*
-*²ÎÊı£ºfilename£¬ÀàĞÍ£ºchar£¬´´½¨ÎÄ¼şµÄÃû³Æ
-size£¬    ÀàĞÍ£ºint£¬ÎÄ¼şµÄ´óĞ¡
-*·µ»ØÖµ£º1£¬³É¹¦£»-1£¬Ê§°Ü
-*¹¦ÄÜ£ºÔÚµ±Ç°Ä¿Â¼ÏÂ´´½¨ÎÄ¼ş
+*å‚æ•°ï¼šfilenameï¼Œç±»å‹ï¼šcharï¼Œåˆ›å»ºæ–‡ä»¶çš„åç§°
+sizeï¼Œ    ç±»å‹ï¼šintï¼Œæ–‡ä»¶çš„å¤§å°
+*è¿”å›å€¼ï¼š1ï¼ŒæˆåŠŸï¼›-1ï¼Œå¤±è´¥
+*åŠŸèƒ½ï¼šåœ¨å½“å‰ç›®å½•ä¸‹åˆ›å»ºæ–‡ä»¶
+* is_diråˆ›å»ºæ–‡ä»¶orç›®å½•
 */
-int fd_cf(char *filename,int size)
+int fd_cf(char *filename, int size, int is_dir)
 {
 
 	struct Entry *pentry;
-	int ret,i=0,cluster_addr,offset;
-	unsigned short cluster,clusterno[100];
+	int ret, i = 0, cluster_addr, offset;
+	unsigned short cluster, clusterno[100];
 	unsigned char c[DIR_ENTRY_SIZE];
-	int index,clustersize;
+	int index, clustersize;
 	unsigned char buf[DIR_ENTRY_SIZE];
 	pentry = (struct Entry*)malloc(sizeof(struct Entry));
 
 
 	clustersize = (size / (CLUSTER_SIZE));
 
-	if(size % (CLUSTER_SIZE) != 0)
-		clustersize ++;
+	if (size % (CLUSTER_SIZE) != 0)
+		clustersize++;
 
-	//É¨Ãè¸ùÄ¿Â¼£¬ÊÇ·ñÒÑ´æÔÚ¸ÃÎÄ¼şÃû
-	ret = ScanEntry(filename,pentry,0);
-	if (ret<0)
+	//////////////////////////åŒºåˆ«ç›®å½•å’Œæ–‡ä»¶/////////////////////////////////////
+	//æ‰«ææ ¹ç›®å½•ï¼Œæ˜¯å¦å·²å­˜åœ¨è¯¥æ–‡ä»¶å
+	if (is_dir)
+		ret = ScanEntry(filename, pentry, 1);
+	else
+		ret = ScanEntry(filename, pentry, 0);
+	////////////////////////////////////////////////////////////////////////////
+
+	if (ret < 0)
 	{
-		/*²éÑ¯fat±í£¬ÕÒµ½¿Õ°×´Ø£¬±£´æÔÚclusterno[]ÖĞ*/
-		for(cluster=2;cluster<1000;cluster++)
+		/*æŸ¥è¯¢fatè¡¨ï¼Œæ‰¾åˆ°ç©ºç™½ç°‡ï¼Œä¿å­˜åœ¨clusterno[]ä¸­*/
+		for (cluster = 2; cluster < 1000; cluster++)
 		{
-			index = cluster *2;
-			if(fatbuf[index]==0x00&&fatbuf[index+1]==0x00)
+			index = cluster * 2;
+			if (fatbuf[index] == 0x00 && fatbuf[index + 1] == 0x00)
 			{
 				clusterno[i] = cluster;
 
 				i++;
-				if(i==clustersize)
+				if (i == clustersize)
 					break;
 
 			}
 
 		}
 
-		/*ÔÚfat±íÖĞĞ´ÈëÏÂÒ»´ØĞÅÏ¢*/
-		for(i=0;i<clustersize-1;i++)
+		/*åœ¨fatè¡¨ä¸­å†™å…¥ä¸‹ä¸€ç°‡ä¿¡æ¯*/
+		for (i = 0; i < clustersize - 1; i++)
 		{
-			index = clusterno[i]*2;
+			index = clusterno[i] * 2;
 
-			fatbuf[index] = (clusterno[i+1] &  0x00ff);
-			fatbuf[index+1] = ((clusterno[i+1] & 0xff00)>>8);
+			fatbuf[index] = (clusterno[i + 1] & 0x00ff);
+			fatbuf[index + 1] = ((clusterno[i + 1] & 0xff00) >> 8);
 
 
 		}
-		/*×îºóÒ»´ØĞ´Èë0xffff*/
-		index = clusterno[i]*2;
+		/*æœ€åä¸€ç°‡å†™å…¥0xffff*/
+		index = clusterno[i] * 2;
 		fatbuf[index] = 0xff;
-		fatbuf[index+1] = 0xff;
+		fatbuf[index + 1] = 0xff;
 
-		if(curdir==NULL)  /*Íù¸ùÄ¿Â¼ÏÂĞ´ÎÄ¼ş*/
-		{ 
+		if (curdir == NULL)  /*å¾€æ ¹ç›®å½•ä¸‹å†™æ–‡ä»¶*/
+		{
 
-			if((ret= lseek(fd,ROOTDIR_OFFSET,SEEK_SET))<0)
+			if ((ret = lseek(fd, ROOTDIR_OFFSET, SEEK_SET)) < 0)
 				perror("lseek ROOTDIR_OFFSET failed");
 			offset = ROOTDIR_OFFSET;
-			while(offset < DATA_OFFSET)
+			while (offset < DATA_OFFSET)
 			{
-				if((ret = read(fd,buf,DIR_ENTRY_SIZE))<0)
+				if ((ret = read(fd, buf, DIR_ENTRY_SIZE)) < 0)
 					perror("read entry failed");
 
 				offset += abs(ret);
 
-				if(buf[0]!=0xe5&&buf[0]!=0x00)
+				if (buf[0] != 0xe5 && buf[0] != 0x00)
 				{
-					while(buf[11] == 0x0f)
+					while (buf[11] == 0x0f)
 					{
-						if((ret = read(fd,buf,DIR_ENTRY_SIZE))<0)
+						if ((ret = read(fd, buf, DIR_ENTRY_SIZE)) < 0)
 							perror("read root dir failed");
-						offset +=abs(ret);
+						offset += abs(ret);
 					}
 				}
 
 
-				/*ÕÒ³ö¿ÕÄ¿Â¼Ïî»òÒÑÉ¾³ıµÄÄ¿Â¼Ïî*/ 
+				/*æ‰¾å‡ºç©ºç›®å½•é¡¹æˆ–å·²åˆ é™¤çš„ç›®å½•é¡¹*/
 				else
-				{       
-					offset = offset-abs(ret);     
-					for(i=0;i<=strlen(filename);i++)
+				{
+					offset = offset - abs(ret);
+					for (i = 0; i <= strlen(filename); i++)
 					{
-						c[i]=toupper(filename[i]);
-					}			
-					for(;i<=10;i++)
-						c[i]=' ';
+						c[i] = toupper(filename[i]);
+					}
+					for (; i <= 10; i++)
+						c[i] = ' ';
 
-					c[11] = 0x01;
+					//////////////////////////åŒºåˆ«ç›®å½•å’Œæ–‡ä»¶/////////////////////////////////////
+					if (is_dir)			//å­ç›®å½•é‚£ä½å¡«1
+						c[11] = 0x11;
+					else
+						c[11] = 0x01;
+					////////////////////////////////////////////////////////////////////////////
 
-					/*Ğ´µÚÒ»´ØµÄÖµ*/
-					c[26] = (clusterno[0] &  0x00ff);
-					c[27] = ((clusterno[0] & 0xff00)>>8);
+					/*å†™ç¬¬ä¸€ç°‡çš„å€¼*/
+					c[26] = (clusterno[0] & 0x00ff);
+					c[27] = ((clusterno[0] & 0xff00) >> 8);
 
-					/*Ğ´ÎÄ¼şµÄ´óĞ¡*/
-					c[28] = (size &  0x000000ff);
-					c[29] = ((size & 0x0000ff00)>>8);
-					c[30] = ((size& 0x00ff0000)>>16);
-					c[31] = ((size& 0xff000000)>>24);
+					/*å†™æ–‡ä»¶çš„å¤§å°*/
+					c[28] = (size & 0x000000ff);
+					c[29] = ((size & 0x0000ff00) >> 8);
+					c[30] = ((size & 0x00ff0000) >> 16);
+					c[31] = ((size & 0xff000000) >> 24);
 
-					if(lseek(fd,offset,SEEK_SET)<0)
+					if (lseek(fd, offset, SEEK_SET) < 0)
 						perror("lseek fd_cf failed");
-					if(write(fd,&c,DIR_ENTRY_SIZE)<0)
+					if (write(fd, &c, DIR_ENTRY_SIZE) < 0)
 						perror("write failed");
 
 
 
 
 					free(pentry);
-					if(WriteFat()<0)
+					if (WriteFat() < 0)
 						exit(1);
 
 					return 1;
@@ -604,58 +616,63 @@ int fd_cf(char *filename,int size)
 
 			}
 		}
-		else 
+		else
 		{
-			cluster_addr = (curdir->FirstCluster -2 )*CLUSTER_SIZE + DATA_OFFSET;
-			if((ret= lseek(fd,cluster_addr,SEEK_SET))<0)
+			cluster_addr = (curdir->FirstCluster - 2)*CLUSTER_SIZE + DATA_OFFSET;
+			if ((ret = lseek(fd, cluster_addr, SEEK_SET)) < 0)
 				perror("lseek cluster_addr failed");
 			offset = cluster_addr;
-			while(offset < cluster_addr + CLUSTER_SIZE)
+			while (offset < cluster_addr + CLUSTER_SIZE)
 			{
-				if((ret = read(fd,buf,DIR_ENTRY_SIZE))<0)
+				if ((ret = read(fd, buf, DIR_ENTRY_SIZE)) < 0)
 					perror("read entry failed");
 
 				offset += abs(ret);
 
-				if(buf[0]!=0xe5&&buf[0]!=0x00)
+				if (buf[0] != 0xe5 && buf[0] != 0x00)
 				{
-					while(buf[11] == 0x0f)
+					while (buf[11] == 0x0f)
 					{
-						if((ret = read(fd,buf,DIR_ENTRY_SIZE))<0)
+						if ((ret = read(fd, buf, DIR_ENTRY_SIZE)) < 0)
 							perror("read root dir failed");
-						offset +=abs(ret);
+						offset += abs(ret);
 					}
 				}
 				else
-				{ 
-					offset = offset - abs(ret);      
-					for(i=0;i<=strlen(filename);i++)
+				{
+					offset = offset - abs(ret);
+					for (i = 0; i <= strlen(filename); i++)
 					{
-						c[i]=toupper(filename[i]);
+						c[i] = toupper(filename[i]);
 					}
-					for(;i<=10;i++)
-						c[i]=' ';
+					for (; i <= 10; i++)
+						c[i] = ' ';
 
-					c[11] = 0x01;
+					//////////////////////////åŒºåˆ«ç›®å½•å’Œæ–‡ä»¶/////////////////////////////////////
+					if (is_dir)			//å­ç›®å½•é‚£ä½å¡«1
+						c[11] = 0x11;
+					else
+						c[11] = 0x01;
+					////////////////////////////////////////////////////////////////////////////
 
-					c[26] = (clusterno[0] &  0x00ff);
-					c[27] = ((clusterno[0] & 0xff00)>>8);
+					c[26] = (clusterno[0] & 0x00ff);
+					c[27] = ((clusterno[0] & 0xff00) >> 8);
 
-					c[28] = (size &  0x000000ff);
-					c[29] = ((size & 0x0000ff00)>>8);
-					c[30] = ((size& 0x00ff0000)>>16);
-					c[31] = ((size& 0xff000000)>>24);
+					c[28] = (size & 0x000000ff);
+					c[29] = ((size & 0x0000ff00) >> 8);
+					c[30] = ((size & 0x00ff0000) >> 16);
+					c[31] = ((size & 0xff000000) >> 24);
 
-					if(lseek(fd,offset,SEEK_SET)<0)
+					if (lseek(fd, offset, SEEK_SET) < 0)
 						perror("lseek fd_cf failed");
-					if(write(fd,&c,DIR_ENTRY_SIZE)<0)
+					if (write(fd, &c, DIR_ENTRY_SIZE) < 0)
 						perror("write failed");
 
 
 
 
 					free(pentry);
-					if(WriteFat()<0)
+					if (WriteFat() < 0)
 						exit(1);
 
 					return 1;
@@ -683,43 +700,51 @@ void do_usage()
 int main()
 {
 	char input[10];
-	int size=0;
+	int size = 0;
 	char name[12];
-	if((fd = open(DEVNAME,O_RDWR))<0)
+
+	if ((fd = open(DEVNAME, O_RDWR)) < 0)
 		perror("open failed");
-	ScanBootSector();
-	if(ReadFat()<0)
+	ScanBootSector();			//æ‰“å°å¯åŠ¨é¡¹è®°å½•
+	if (ReadFat() < 0)			//è¯»fatè¡¨çš„ä¿¡æ¯ï¼Œå­˜å…¥fatbuf[]ä¸­
 		exit(1);
-	do_usage();
+	do_usage();					//æ‰“å°æç¤ºä¿¡æ¯
+
+
 	while (1)
 	{
 		printf(">");
-		scanf("%s",input);
+		scanf("%s", input);
 
 		if (strcmp(input, "exit") == 0)
 			break;
 		else if (strcmp(input, "ls") == 0)
 			fd_ls();
-		else if(strcmp(input, "cd") == 0)
+		else if (strcmp(input, "cd") == 0)
 		{
 			scanf("%s", name);
 			fd_cd(name);
 		}
-		else if(strcmp(input, "df") == 0)
+		else if (strcmp(input, "df") == 0)
 		{
 			scanf("%s", name);
 			fd_df(name);
 		}
-		else if(strcmp(input, "cf") == 0)
+		else if (strcmp(input, "cf") == 0)
 		{
 			scanf("%s", name);
 			scanf("%s", input);
 			size = atoi(input);
-			fd_cf(name,size);
+			fd_cf(name, size, 0);
+		}
+		else if (strcmp(input, "mkdir") == 0)
+		{
+			scanf("%s", name);
+			fd_cf(name, 1, 1);
 		}
 		else
 			do_usage();
-	}	
+	}
 
 	return 0;
 }
