@@ -218,31 +218,47 @@ int fd_ls()
 
 	else /*显示子目录*/
 	{
-		cluster_addr = DATA_OFFSET + (curdir->FirstCluster - 2) * CLUSTER_SIZE;
-		if ((ret = lseek(fd, cluster_addr, SEEK_SET)) < 0)
-			perror("lseek cluster_addr failed");
-
-		offset = cluster_addr;
-
-		/*只读一簇的内容*/
-		while (offset < cluster_addr + CLUSTER_SIZE)
+		//读取目录的所有cluster,而不是只读第一个cluster
+		short cur_cluster = curdir->FirstCluster;
+		while (1)
 		{
-			ret = GetEntry(&entry);
-			offset += abs(ret);
-			if (ret > 0)
+
+			cluster_addr = DATA_OFFSET + (cur_cluster - 2) * CLUSTER_SIZE;
+			if ((ret = lseek(fd, cluster_addr, SEEK_SET)) < 0)
+				perror("lseek cluster_addr failed");
+
+			offset = cluster_addr;
+
+			/*读一簇的内容*/
+			while (offset < cluster_addr + CLUSTER_SIZE)
 			{
-				printf("%12s\t"
-					"%d:%d:%d\t"
-					"%d:%d:%d   \t"
-					"%d\t"
-					"%d\t\t"
-					"%s\n",
-					entry.short_name,
-					entry.year, entry.month, entry.day,
-					entry.hour, entry.min, entry.sec,
-					entry.FirstCluster,
-					entry.size,
-					(entry.subdir) ? "dir" : "file");
+				ret = GetEntry(&entry);
+				offset += abs(ret);
+				if (ret > 0)
+				{
+					printf("%12s\t"
+						"%d:%d:%d\t"
+						"%d:%d:%d   \t"
+						"%d\t"
+						"%d\t\t"
+						"%s\n",
+						entry.short_name,
+						entry.year, entry.month, entry.day,
+						entry.hour, entry.min, entry.sec,
+						entry.FirstCluster,
+						entry.size,
+						(entry.subdir) ? "dir" : "file");
+				}
+			}
+// 			printf("%d\n", GetFatCluster(cur_cluster));
+// 			sleep(5);
+			if (GetFatCluster(cur_cluster) != 0xffff)
+			{
+				cur_cluster = GetFatCluster(cur_cluster);
+			}
+			else
+			{
+				break;
 			}
 		}
 	}
@@ -604,9 +620,6 @@ int fd_cf(char *filename, int size, int is_dir)
 					if (write(fd, &c, DIR_ENTRY_SIZE) < 0)
 						perror("write failed");
 
-
-
-
 					free(pentry);
 					if (WriteFat() < 0)
 						exit(1);
@@ -618,66 +631,159 @@ int fd_cf(char *filename, int size, int is_dir)
 		}
 		else
 		{
-			cluster_addr = (curdir->FirstCluster - 2)*CLUSTER_SIZE + DATA_OFFSET;
-			if ((ret = lseek(fd, cluster_addr, SEEK_SET)) < 0)
-				perror("lseek cluster_addr failed");
-			offset = cluster_addr;
-			while (offset < cluster_addr + CLUSTER_SIZE)
+			short cur_cluster = curdir->FirstCluster;
+			while (1)
 			{
-				if ((ret = read(fd, buf, DIR_ENTRY_SIZE)) < 0)
-					perror("read entry failed");
 
-				offset += abs(ret);
+				cluster_addr = (cur_cluster - 2)*CLUSTER_SIZE + DATA_OFFSET;
+				if ((ret = lseek(fd, cluster_addr, SEEK_SET)) < 0)
+					perror("lseek cluster_addr failed");
+				offset = cluster_addr;
 
-				if (buf[0] != 0xe5 && buf[0] != 0x00)
+				while (offset < cluster_addr + CLUSTER_SIZE)
 				{
-					while (buf[11] == 0x0f)
+					if ((ret = read(fd, buf, DIR_ENTRY_SIZE)) < 0)
+						perror("read entry failed");
+
+					offset += abs(ret);		//read返回成功读取的字节数
+
+					if (buf[0] != 0xe5 && buf[0] != 0x00)
 					{
-						if ((ret = read(fd, buf, DIR_ENTRY_SIZE)) < 0)
-							perror("read root dir failed");
-						offset += abs(ret);
+						while (buf[11] == 0x0f)
+						{
+							if ((ret = read(fd, buf, DIR_ENTRY_SIZE)) < 0)
+								perror("read root dir failed");
+							offset += abs(ret);
+						}
 					}
+					else
+					{
+						offset = offset - abs(ret);
+						for (i = 0; i <= strlen(filename); i++)
+						{
+							c[i] = toupper(filename[i]);
+						}
+						for (; i <= 10; i++)
+							c[i] = ' ';
+
+						//////////////////////////区别目录和文件/////////////////////////////////////
+						if (is_dir)			//子目录那位填1
+							c[11] = 0x11;
+						else
+							c[11] = 0x01;
+						////////////////////////////////////////////////////////////////////////////
+
+						c[26] = (clusterno[0] & 0x00ff);
+						c[27] = ((clusterno[0] & 0xff00) >> 8);
+
+						c[28] = (size & 0x000000ff);
+						c[29] = ((size & 0x0000ff00) >> 8);
+						c[30] = ((size & 0x00ff0000) >> 16);
+						c[31] = ((size & 0xff000000) >> 24);
+
+						if (lseek(fd, offset, SEEK_SET) < 0)
+							perror("lseek fd_cf failed");
+						if (write(fd, &c, DIR_ENTRY_SIZE) < 0)
+							perror("write failed");
+
+						free(pentry);
+						if (WriteFat() < 0)
+							exit(1);
+
+						return 1;
+					}
+
+				}
+
+				if (GetFatCluster(cur_cluster) != 0xffff)
+				{
+					cur_cluster = GetFatCluster(cur_cluster);
 				}
 				else
 				{
-					offset = offset - abs(ret);
-					for (i = 0; i <= strlen(filename); i++)
+					//最后一个cluster了还没找到能分配的，先撸新的cluster给目录
+					//查询fat表，找到空白簇
+					for (cluster = 2; cluster < 1000; cluster++)
 					{
-						c[i] = toupper(filename[i]);
+						index = cluster * 2;
+						//みつけた！
+						if (fatbuf[index] == 0x00 && fatbuf[index + 1] == 0x00)
+						{
+							//新的cluster对应的fat表填ffff
+							fatbuf[index] = 0xff;
+							fatbuf[index + 1] = 0xff;
+
+							//cur_cluster下一个变成新撸的
+							fatbuf[cur_cluster * 2] = (cluster & 0x00ff);
+							fatbuf[cur_cluster * 2 + 1] = ((cluster & 0xff00) >> 8);
+							break;
+						}
+
 					}
-					for (; i <= 10; i++)
-						c[i] = ' ';
+					printf("%d\n%d\n", GetFatCluster(cur_cluster), GetFatCluster(GetFatCluster(cur_cluster)));
 
-					//////////////////////////区别目录和文件/////////////////////////////////////
-					if (is_dir)			//子目录那位填1
-						c[11] = 0x11;
-					else
-						c[11] = 0x01;
-					////////////////////////////////////////////////////////////////////////////
+					cur_cluster = GetFatCluster(cur_cluster);
 
-					c[26] = (clusterno[0] & 0x00ff);
-					c[27] = ((clusterno[0] & 0xff00) >> 8);
+					cluster_addr = (cur_cluster - 2)*CLUSTER_SIZE + DATA_OFFSET;
+					if ((ret = lseek(fd, cluster_addr, SEEK_SET)) < 0)
+						perror("lseek cluster_addr failed");
+					offset = cluster_addr;
 
-					c[28] = (size & 0x000000ff);
-					c[29] = ((size & 0x0000ff00) >> 8);
-					c[30] = ((size & 0x00ff0000) >> 16);
-					c[31] = ((size & 0xff000000) >> 24);
+					while (offset < cluster_addr + CLUSTER_SIZE)
+					{
+						if ((ret = read(fd, buf, DIR_ENTRY_SIZE)) < 0)
+							perror("read entry failed");
 
-					if (lseek(fd, offset, SEEK_SET) < 0)
-						perror("lseek fd_cf failed");
-					if (write(fd, &c, DIR_ENTRY_SIZE) < 0)
-						perror("write failed");
+						offset += abs(ret);		//read返回成功读取的字节数
 
+						if (buf[0] != 0xe5 && buf[0] != 0x00)
+						{
+							while (buf[11] == 0x0f)
+							{
+								if ((ret = read(fd, buf, DIR_ENTRY_SIZE)) < 0)
+									perror("read root dir failed");
+								offset += abs(ret);
+							}
+						}
+						else
+						{
+							offset = offset - abs(ret);
+							for (i = 0; i <= strlen(filename); i++)
+							{
+								c[i] = toupper(filename[i]);
+							}
+							for (; i <= 10; i++)
+								c[i] = ' ';
 
+							//////////////////////////区别目录和文件/////////////////////////////////////
+							if (is_dir)			//子目录那位填1
+								c[11] = 0x11;
+							else
+								c[11] = 0x01;
+							////////////////////////////////////////////////////////////////////////////
 
+							c[26] = (clusterno[0] & 0x00ff);
+							c[27] = ((clusterno[0] & 0xff00) >> 8);
 
-					free(pentry);
-					if (WriteFat() < 0)
-						exit(1);
+							c[28] = (size & 0x000000ff);
+							c[29] = ((size & 0x0000ff00) >> 8);
+							c[30] = ((size & 0x00ff0000) >> 16);
+							c[31] = ((size & 0xff000000) >> 24);
 
-					return 1;
+							if (lseek(fd, offset, SEEK_SET) < 0)
+								perror("lseek fd_cf failed");
+							if (write(fd, &c, DIR_ENTRY_SIZE) < 0)
+								perror("write failed");
+
+							free(pentry);
+							if (WriteFat() < 0)
+								exit(1);
+
+							return 1;
+						}
+
+					}
 				}
-
 			}
 		}
 	}
