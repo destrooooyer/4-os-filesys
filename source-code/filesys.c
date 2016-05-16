@@ -288,12 +288,11 @@ int ScanEntry(char *entryname, struct Entry *pentry, int mode)
 			perror("lseek ROOTDIR_OFFSET failed");
 		offset = ROOTDIR_OFFSET;
 
-
+		//从根目录区起始位置开始一次读取32字节数据保存在pentry中
 		while (offset < DATA_OFFSET)
 		{
 			ret = GetEntry(pentry);
 			offset += abs(ret);
-
 			if (pentry->subdir == mode &&!strcmp((char*)pentry->short_name, uppername))
 				return offset;
 
@@ -337,6 +336,52 @@ int ScanEntry(char *entryname, struct Entry *pentry, int mode)
 	///////////////////////////////////////////////////////////////////////////////////////
 }
 
+//cd到绝对路径下
+int newScanEntry(char *entryname, struct Entry *pentry, int mode){
+
+	int n=0,i=0,j=0;
+	char name[100] = {'\0'};
+	char *path[10] = {NULL}; //将绝对路径分解
+	int pathNumber = 0;   //绝对路径分成几部分,最后一部分是最终目录
+	char *p = "\\";
+
+	int ret;
+	struct Entry *pentry2;
+	pentry2 = (struct Entry*)malloc(sizeof(struct Entry));
+
+	n=strlen(entryname);
+	for(i=0;i<n;i++){
+		name[i]=*(entryname++);
+	}
+	i=0;
+	path[i]=strtok(name,p);
+	while(path[i]!= NULL ) {
+       i++;
+       path[i] = strtok( NULL, p);
+    }
+    pathNumber = i;
+    //先从根目录找起
+    curdir = NULL;
+    dirno = 0;
+    j=0;
+    while(j<pathNumber-1){
+   		ret=ScanEntry(path[j],pentry2,1);
+    	if (ret < 0){
+			printf("no such dir\n");
+			free(pentry2);
+			return -1;
+		}
+		dirno++;   //?????
+		fatherdir[dirno] = curdir;
+		curdir = pentry2;
+		j++;
+    }
+    ret=ScanEntry(path[j],pentry,1);
+
+    return 1;
+}
+
+
 
 
 /*
@@ -348,6 +393,7 @@ int fd_cd(char *dir)
 {
 	struct Entry *pentry;
 	int ret;
+	char *p = "\\";
 
 	if (!strcmp(dir, "."))
 	{
@@ -363,8 +409,14 @@ int fd_cd(char *dir)
 		return 1;
 	}
 	pentry = (struct Entry*)malloc(sizeof(struct Entry));
-
-	ret = ScanEntry(dir, pentry, 1);
+/***********************************************************************************/
+	if(strstr(dir,p)){
+		ret = newScanEntry(dir, pentry, 1);
+	}
+	else{
+		ret = ScanEntry(dir, pentry, 1);
+	}
+/***********************************************************************************/	
 	if (ret < 0)
 	{
 		printf("no such dir\n");
