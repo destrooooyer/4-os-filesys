@@ -302,25 +302,39 @@ int ScanEntry(char *entryname, struct Entry *pentry, int mode)
 	}
 
 	/*扫描子目录*/
+	//////////////////////////////原本只读一簇，改为读所有簇//////////////////////////////////////////////
 	else
 	{
-		cluster_addr = DATA_OFFSET + (curdir->FirstCluster - 2)*CLUSTER_SIZE;
-		if ((ret = lseek(fd, cluster_addr, SEEK_SET)) < 0)
-			perror("lseek cluster_addr failed");
-		offset = cluster_addr;
-
-		while (offset < cluster_addr + CLUSTER_SIZE)
+		short cur_cluster = curdir->FirstCluster;
+		while (1)
 		{
-			ret = GetEntry(pentry);
-			offset += abs(ret);
-			if (pentry->subdir == mode &&!strcmp((char*)pentry->short_name, uppername))
-				return offset;
+			cluster_addr = DATA_OFFSET + (cur_cluster - 2) * CLUSTER_SIZE;
+			if ((ret = lseek(fd, cluster_addr, SEEK_SET)) < 0)
+				perror("lseek cluster_addr failed");
 
+			offset = cluster_addr;
 
+			while (offset < cluster_addr + CLUSTER_SIZE)
+			{
+				ret = GetEntry(pentry);
+				offset += abs(ret);
+				if (pentry->subdir == mode &&!strcmp((char*)pentry->short_name, uppername))
+					return offset;
 
+			}
+			if (GetFatCluster(cur_cluster) != 0xffff)
+			{
+				cur_cluster = GetFatCluster(cur_cluster);
+			}
+			else
+			{
+				break;
+			}
 		}
-		return -1;
+		
 	}
+	return -1;
+	///////////////////////////////////////////////////////////////////////////////////////
 }
 
 
@@ -629,8 +643,10 @@ int fd_cf(char *filename, int size, int is_dir)
 
 			}
 		}
-		else
+		else	//非根目录
 		{
+			///////////////////////////////////////////////////////////////////////////////
+			//改为在所有簇里找空位置，如果所有簇里都没有空位置，给目录添加新簇
 			short cur_cluster = curdir->FirstCluster;
 			while (1)
 			{
@@ -722,6 +738,7 @@ int fd_cf(char *filename, int size, int is_dir)
 					}
 					printf("%d\n%d\n", GetFatCluster(cur_cluster), GetFatCluster(GetFatCluster(cur_cluster)));
 
+					//分配新的簇之后，把entry弄进去
 					cur_cluster = GetFatCluster(cur_cluster);
 
 					cluster_addr = (cur_cluster - 2)*CLUSTER_SIZE + DATA_OFFSET;
@@ -785,6 +802,8 @@ int fd_cf(char *filename, int size, int is_dir)
 					}
 				}
 			}
+
+			///////////////////////////////////////////////////////////////////////////////
 		}
 	}
 	else
