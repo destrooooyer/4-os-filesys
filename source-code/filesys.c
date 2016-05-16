@@ -341,7 +341,7 @@ int newScanEntry(char *entryname, struct Entry *pentry, int mode){
 			free(pentry2);
 			return -1;
 		}
-		dirno++;   //?????
+		dirno++;
 		fatherdir[dirno] = curdir;
 		curdir = pentry2;
 		j++;
@@ -754,6 +754,19 @@ int main()
 	char input[10];
 	int size = 0;
 	char name[12];
+	char tempname[12];  //strtok函数会把name给改了,所以要来个副本
+
+	int n=0,i=0,j=0;
+	char *path[10] = {NULL}; //将绝对路径分解
+	int pathNumber = 0;   //绝对路径分成几部分,最后一部分是最终目录
+	char *p = "\\";
+	char *nowp = NULL;
+	struct Entry *tempcurdir = NULL;
+	int ret = 0;
+	struct Entry *pentry;
+	pentry = (struct Entry*)malloc(sizeof(struct Entry));
+	
+
 
 	if ((fd = open(DEVNAME, O_RDWR)) < 0)
 		perror("open failed");
@@ -768,14 +781,49 @@ int main()
 		printf(">");
 		scanf("%s", input);
 
-		if (strcmp(input, "exit") == 0)
+		if (strcmp(input, "exit") == 0){
 			break;
-		else if (strcmp(input, "ls") == 0)
+		}
+			
+		else if (strcmp(input, "ls") == 0){
 			fd_ls();
+		}
 		else if (strcmp(input, "cd") == 0)
 		{
 			scanf("%s", name);
-			fd_cd(name);
+			for(i=0;i<12;i++){
+				tempname[i]=name[i];
+			}
+			//name中含有
+			if(strstr(name,p)){
+				i=0;
+				path[i]=strtok(tempname,p);
+				while(path[i]!= NULL ) {
+     				i++;
+       				path[i] = strtok( NULL, p);
+    			}
+    			pathNumber = i;
+
+    			
+    			//如果第一个是根目录下的,就是绝对路径
+    			tempcurdir = curdir;
+    			curdir = NULL;
+    			ret = ScanEntry(path[0], pentry, 1);
+    			//相对路径
+    			if(ret<0){
+    				curdir = tempcurdir;
+    				for(i=0;i<pathNumber;i++){
+    					fd_cd(path[i]);
+    				}
+    			}
+    			else{
+    				printf("%s\n", name);
+    				fd_cd(name);
+    			}
+    		}
+    		else{
+				fd_cd(name);
+			}
 		}
 		else if (strcmp(input, "df") == 0)
 		{
