@@ -123,6 +123,7 @@ int GetEntry(struct Entry *pentry)
 		perror("read entry failed");
 	count += ret;
 
+	//printf("//%d//\n", buf[0]);
 	if (buf[0] == 0xe5 || buf[0] == 0x00)
 		return -1 * count;
 	else
@@ -283,6 +284,7 @@ int ScanEntry(char *entryname, struct Entry *pentry, int mode)
 	char uppername[80];
 	for (i = 0; i < strlen(entryname); i++)
 		uppername[i] = toupper(entryname[i]);
+	memset(pentry, 0, sizeof(pentry));
 	uppername[i] = '\0';
 	/*扫描根目录*/
 	if (curdir == NULL)
@@ -525,7 +527,6 @@ int fd_df(char *filename, int is_dir)
 	int ret;
 	unsigned char c;
 	unsigned short seed, next;
-	int temp;
 	int cluster_addr;
 	int offset;
 	struct Entry *entry;
@@ -537,7 +538,6 @@ int fd_df(char *filename, int is_dir)
 	if (is_dir)
 	{
 		ret = ScanEntry(filename, pentry, 1);
-		temp = ret;
 		printf("----------------------\cluster:\t%d\n", curdir->FirstCluster);
 		if (ret < 0)
 		{
@@ -665,7 +665,7 @@ int fd_df(char *filename, int is_dir)
 				c = 0xe5;
 
 				printf("%d\t%d\t%d\n", ret,pentry->FirstCluster, DATA_OFFSET + (pentry->FirstCluster - 2) * CLUSTER_SIZE);
-				if (lseek(fd, temp - 0x20, SEEK_SET) < 0)
+				if (lseek(fd, ret - 0x20, SEEK_SET) < 0)
 					perror("lseek fd_df failed");
 				if (write(fd, &c, 1) < 0)
 					perror("write failed");
@@ -683,8 +683,6 @@ int fd_df(char *filename, int is_dir)
 	else
 	{
 		/*扫描当前目录查找文件*/
-		ret = ScanEntry(filename, pentry, 0);
-		temp = ret;
 		ret = ScanEntry(filename, pentry, 0);
 
 		if (ret < 0)
@@ -708,7 +706,7 @@ int fd_df(char *filename, int is_dir)
 		/*清除目录表项*/
 		c = 0xe5;
 
-		if (lseek(fd, temp - 0x20, SEEK_SET) < 0)
+		if (lseek(fd, ret - 0x20, SEEK_SET) < 0)
 			perror("lseek fd_df failed");
 		if (write(fd, &c, 1) < 0)
 			perror("write failed");
