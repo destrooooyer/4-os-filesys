@@ -534,6 +534,8 @@ int fd_df(char *filename, int is_dir)
 					if (entry->subdir)
 					{
 						//printf("dir--------------\n");
+						free(curdir);
+						curdir = (struct Entry*)malloc(sizeof(struct Entry));
 						memcpy(curdir, pentry, sizeof(struct Entry));
 						fd_df(entry->short_name, 1);
 						//sleep(2);
