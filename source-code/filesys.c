@@ -1041,6 +1041,7 @@ int main()
     				}
     			}
     			else{
+    				dirno = 0;
     				for(i=0;i<pathNumber;i++){
     					fd_cd(path[i]);
     				}
