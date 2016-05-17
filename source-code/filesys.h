@@ -67,7 +67,7 @@ struct Entry{
 
 int fd_ls();
 int fd_cd(char *dir);
-int fd_df(char *file_name);
+int fd_df(char *file_name,int is_dir);
 int fd_cf(char *file_name,int size,int is_dir);
 
 void findDate(unsigned short *year,
