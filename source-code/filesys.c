@@ -684,6 +684,19 @@ size，    类型：int，文件的大小
 */
 int fd_cf(char *filename, int size, int is_dir)
 {
+	unsigned char *stringaddr, inputstring[CLUSTER_SIZE * 10] = { "\0" };
+	unsigned char cin;
+	if (!is_dir&&size < 0)
+	{
+		int j;
+		cin = getchar();
+		if (size < 0) {
+			for (; (cin = getchar()) != '\n';) {
+				inputstring[j++] = cin;
+			}
+			size = j;
+		}
+	}
 
 	struct Entry *pentry;
 	int ret, i = 0, cluster_addr, offset;
@@ -797,6 +810,18 @@ int fd_cf(char *filename, int size, int is_dir)
 					if (write(fd, &c, DIR_ENTRY_SIZE) < 0)
 						perror("write failed");
 
+					short temp_cur_cluster = RevByte(c[26], c[27]);
+					stringaddr = inputstring;
+					for (i = 0; i < clustersize; ++i) {
+						offset = DATA_OFFSET + (temp_cur_cluster - 2) * CLUSTER_SIZE;
+						if (lseek(fd, offset, SEEK_SET) < 0)
+							perror("lseek fd_cf failed");
+						if (write(fd, stringaddr, CLUSTER_SIZE) < 0)
+							perror("write failed");
+						stringaddr = stringaddr + CLUSTER_SIZE;
+						cluster = GetFatCluster(cluster);
+					}
+
 					free(pentry);
 					if (WriteFat() < 0)
 						exit(1);
@@ -864,6 +889,18 @@ int fd_cf(char *filename, int size, int is_dir)
 							perror("lseek fd_cf failed");
 						if (write(fd, &c, DIR_ENTRY_SIZE) < 0)
 							perror("write failed");
+
+						short temp_cur_cluster = RevByte(c[26], c[27]);
+						stringaddr = inputstring;
+						for (i = 0; i < clustersize; ++i) {
+							offset = DATA_OFFSET + (temp_cur_cluster - 2) * CLUSTER_SIZE;
+							if (lseek(fd, offset, SEEK_SET) < 0)
+								perror("lseek fd_cf failed");
+							if (write(fd, stringaddr, CLUSTER_SIZE) < 0)
+								perror("write failed");
+							stringaddr = stringaddr + CLUSTER_SIZE;
+							cluster = GetFatCluster(cluster);
+						}
 
 						free(pentry);
 						if (WriteFat() < 0)
@@ -954,6 +991,18 @@ int fd_cf(char *filename, int size, int is_dir)
 								perror("lseek fd_cf failed");
 							if (write(fd, &c, DIR_ENTRY_SIZE) < 0)
 								perror("write failed");
+
+							short temp_cur_cluster = RevByte(c[26], c[27]);
+							stringaddr = inputstring;
+							for (i = 0; i < clustersize; ++i) {
+								offset = DATA_OFFSET + (temp_cur_cluster - 2) * CLUSTER_SIZE;
+								if (lseek(fd, offset, SEEK_SET) < 0)
+									perror("lseek fd_cf failed");
+								if (write(fd, stringaddr, CLUSTER_SIZE) < 0)
+									perror("write failed");
+								stringaddr = stringaddr + CLUSTER_SIZE;
+								cluster = GetFatCluster(cluster);
+							}
 
 							free(pentry);
 							if (WriteFat() < 0)
