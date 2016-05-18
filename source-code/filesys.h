@@ -1,7 +1,7 @@
 #ifndef FILESYS_H
 #define FILESYS_H
 #include<stddef.h>
-#define DEVNAME "/dev/sdb1"                         
+#define DEVNAME "data"                         
 #define DIR_ENTRY_SIZE 32
 #define SECTOR_SIZE 512
 #define CLUSTER_SIZE 512*4                         
