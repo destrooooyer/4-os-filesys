@@ -6,9 +6,9 @@
 #define SECTOR_SIZE 512
 #define CLUSTER_SIZE 512*4                         
 #define FAT_ONE_OFFSET 512                       
-#define FAT_TWO_OFFSET 512+250*512                       
-#define ROOTDIR_OFFSET 512+250*512+250*512+512                     
-#define DATA_OFFSET 512+250*512+250*512+512*32        
+#define FAT_TWO_OFFSET 512+256*512                       
+#define ROOTDIR_OFFSET 512+256*512+256*512+512                     
+#define DATA_OFFSET 512+256*512+256*512+512*32        
 
            
 
