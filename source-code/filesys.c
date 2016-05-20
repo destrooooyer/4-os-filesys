@@ -232,7 +232,12 @@ int fd_ls()
 				perror("lseek cluster_addr failed");
 
 			offset = cluster_addr;
-
+			if (GetFatCluster(cur_cluster) == 0)
+			{
+				fatbuf[cur_cluster * 2] = 0xff;
+				fatbuf[cur_cluster * 2 + 1] = 0xff;
+				WriteFat();
+			}
 			/*读一簇的内容*/
 			while (offset < cluster_addr + CLUSTER_SIZE)
 			{
@@ -712,6 +717,9 @@ int fd_cf(char *filename, int size, int is_dir)
 	if (size % (CLUSTER_SIZE) != 0)
 		clustersize++;
 
+	if (clustersize == 0)
+		clustersize = 1;
+
 	//////////////////////////区别目录和文件/////////////////////////////////////
 	//扫描根目录，是否已存在该文件名
 	if (is_dir)
@@ -810,18 +818,22 @@ int fd_cf(char *filename, int size, int is_dir)
 					if (write(fd, &c, DIR_ENTRY_SIZE) < 0)
 						perror("write failed");
 
-					short temp_cur_cluster = RevByte(c[26], c[27]);
-					stringaddr = inputstring;
-					for (i = 0; i < clustersize; ++i) {
-						offset = DATA_OFFSET + (temp_cur_cluster - 2) * CLUSTER_SIZE;
-						if (lseek(fd, offset, SEEK_SET) < 0)
-							perror("lseek fd_cf failed");
-						if (write(fd, stringaddr, CLUSTER_SIZE) < 0)
-							perror("write failed");
-						stringaddr = stringaddr + CLUSTER_SIZE;
-						cluster = GetFatCluster(cluster);
+					/////////////////////////////写入实际内容///////////////////////////////////////
+					if (!is_dir)
+					{
+						short temp_cur_cluster = RevByte(c[26], c[27]);
+						stringaddr = inputstring;
+						for (i = 0; i < clustersize; ++i) {
+							offset = DATA_OFFSET + (temp_cur_cluster - 2) * CLUSTER_SIZE;
+							if (lseek(fd, offset, SEEK_SET) < 0)
+								perror("lseek fd_cf failed");
+							if (write(fd, stringaddr, CLUSTER_SIZE) < 0)
+								perror("write failed");
+							stringaddr = stringaddr + CLUSTER_SIZE;
+							temp_cur_cluster = GetFatCluster(temp_cur_cluster);
+						}
 					}
-
+					//////////////////////////////////////////////////////////////////////////////
 					free(pentry);
 					if (WriteFat() < 0)
 						exit(1);
@@ -890,17 +902,22 @@ int fd_cf(char *filename, int size, int is_dir)
 						if (write(fd, &c, DIR_ENTRY_SIZE) < 0)
 							perror("write failed");
 
-						short temp_cur_cluster = RevByte(c[26], c[27]);
-						stringaddr = inputstring;
-						for (i = 0; i < clustersize; ++i) {
-							offset = DATA_OFFSET + (temp_cur_cluster - 2) * CLUSTER_SIZE;
-							if (lseek(fd, offset, SEEK_SET) < 0)
-								perror("lseek fd_cf failed");
-							if (write(fd, stringaddr, CLUSTER_SIZE) < 0)
-								perror("write failed");
-							stringaddr = stringaddr + CLUSTER_SIZE;
-							cluster = GetFatCluster(cluster);
+						/////////////////////////////写入实际内容///////////////////////////////////////
+						if (!is_dir)
+						{
+							short temp_cur_cluster = RevByte(c[26], c[27]);
+							stringaddr = inputstring;
+							for (i = 0; i < clustersize; ++i) {
+								offset = DATA_OFFSET + (temp_cur_cluster - 2) * CLUSTER_SIZE;
+								if (lseek(fd, offset, SEEK_SET) < 0)
+									perror("lseek fd_cf failed");
+								if (write(fd, stringaddr, CLUSTER_SIZE) < 0)
+									perror("write failed");
+								stringaddr = stringaddr + CLUSTER_SIZE;
+								temp_cur_cluster = GetFatCluster(temp_cur_cluster);
+							}
 						}
+						///////////////////////////////////////////////////////////////////////////////
 
 						free(pentry);
 						if (WriteFat() < 0)
@@ -917,6 +934,7 @@ int fd_cf(char *filename, int size, int is_dir)
 				}
 				else
 				{
+					//////////////////////////////////////////////////////////////
 					//最后一个cluster了还没找到能分配的，先撸新的cluster给目录
 					//查询fat表，找到空白簇
 					for (cluster = 2; cluster < 1000; cluster++)
@@ -936,6 +954,7 @@ int fd_cf(char *filename, int size, int is_dir)
 						}
 
 					}
+					//////////////////////////////////////////////////////////////
 					printf("%d\n%d\n", GetFatCluster(cur_cluster), GetFatCluster(GetFatCluster(cur_cluster)));
 
 					//分配新的簇之后，把entry弄进去
@@ -992,18 +1011,22 @@ int fd_cf(char *filename, int size, int is_dir)
 							if (write(fd, &c, DIR_ENTRY_SIZE) < 0)
 								perror("write failed");
 
-							short temp_cur_cluster = RevByte(c[26], c[27]);
-							stringaddr = inputstring;
-							for (i = 0; i < clustersize; ++i) {
-								offset = DATA_OFFSET + (temp_cur_cluster - 2) * CLUSTER_SIZE;
-								if (lseek(fd, offset, SEEK_SET) < 0)
-									perror("lseek fd_cf failed");
-								if (write(fd, stringaddr, CLUSTER_SIZE) < 0)
-									perror("write failed");
-								stringaddr = stringaddr + CLUSTER_SIZE;
-								cluster = GetFatCluster(cluster);
+							/////////////////////////////写入实际内容///////////////////////////////////////
+							if (!is_dir)
+							{
+								short temp_cur_cluster = RevByte(c[26], c[27]);
+								stringaddr = inputstring;
+								for (i = 0; i < clustersize; ++i) {
+									offset = DATA_OFFSET + (temp_cur_cluster - 2) * CLUSTER_SIZE;
+									if (lseek(fd, offset, SEEK_SET) < 0)
+										perror("lseek fd_cf failed");
+									if (write(fd, stringaddr, CLUSTER_SIZE) < 0)
+										perror("write failed");
+									stringaddr = stringaddr + CLUSTER_SIZE;
+									temp_cur_cluster = GetFatCluster(temp_cur_cluster);
+								}
 							}
-
+							///////////////////////////////////////////////////////////////////////////////
 							free(pentry);
 							if (WriteFat() < 0)
 								exit(1);
@@ -1139,7 +1162,7 @@ int main()
 		{
 			scanf("%s", name);
 
-			fd_cf(name, 1, 1);
+			fd_cf(name, 0, 1);
 		}
 		else
 			do_usage();
