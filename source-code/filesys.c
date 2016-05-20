@@ -382,6 +382,13 @@ int fd_cd(char *dir)
 		free(pentry);
 		return -1;
 	}
+	short cur_cluster = pentry->FirstCluster;
+	if (GetFatCluster(cur_cluster) == 0)
+	{
+		fatbuf[cur_cluster * 2] = 0xff;
+		fatbuf[cur_cluster * 2 + 1] = 0xff;
+		WriteFat();
+	}
 	dirno++;
 	fatherdir[dirno] = curdir;
 	curdir = pentry;
