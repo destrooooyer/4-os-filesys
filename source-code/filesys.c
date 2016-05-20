@@ -693,7 +693,7 @@ int fd_cf(char *filename, int size, int is_dir)
 	unsigned char cin;
 	if (!is_dir&&size < 0)
 	{
-		int j;
+		int j=0;
 		cin = getchar();
 		if (size < 0) {
 			for (; (cin = getchar()) != '\n';) {
