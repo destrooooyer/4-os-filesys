@@ -689,11 +689,12 @@ size，    类型：int，文件的大小
 */
 int fd_cf(char *filename, int size, int is_dir)
 {
+	int write_flag = size < 0 ? 1 : 0;
 	unsigned char *stringaddr, inputstring[CLUSTER_SIZE * 10] = { "\0" };
 	unsigned char cin;
 	if (!is_dir&&size < 0)
 	{
-		int j=0;
+		int j = 0;
 		cin = getchar();
 		if (size < 0) {
 			for (; (cin = getchar()) != '\n';) {
@@ -819,7 +820,7 @@ int fd_cf(char *filename, int size, int is_dir)
 						perror("write failed");
 
 					/////////////////////////////写入实际内容///////////////////////////////////////
-					if (!is_dir)
+					if (!is_dir&&write_flag)
 					{
 						short temp_cur_cluster = RevByte(c[26], c[27]);
 						stringaddr = inputstring;
@@ -903,7 +904,7 @@ int fd_cf(char *filename, int size, int is_dir)
 							perror("write failed");
 
 						/////////////////////////////写入实际内容///////////////////////////////////////
-						if (!is_dir)
+						if (!is_dir&&write_flag)
 						{
 							short temp_cur_cluster = RevByte(c[26], c[27]);
 							stringaddr = inputstring;
@@ -1012,7 +1013,7 @@ int fd_cf(char *filename, int size, int is_dir)
 								perror("write failed");
 
 							/////////////////////////////写入实际内容///////////////////////////////////////
-							if (!is_dir)
+							if (!is_dir&&write_flag)
 							{
 								short temp_cur_cluster = RevByte(c[26], c[27]);
 								stringaddr = inputstring;
