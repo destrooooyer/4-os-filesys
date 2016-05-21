@@ -169,6 +169,145 @@ int GetEntry(struct Entry *pentry)
 	}
 }
 
+int scan()
+{
+	int ret, offset, cluster_addr;
+	struct Entry entry;
+	unsigned char buf[DIR_ENTRY_SIZE];
+	if ((ret = read(fd, buf, DIR_ENTRY_SIZE)) < 0)
+		perror("read entry failed");
+
+	if (curdir == NULL)
+	{
+		/*将fd定位到根目录区的起始地址*/
+		if ((ret = lseek(fd, ROOTDIR_OFFSET, SEEK_SET)) < 0)
+			perror("lseek ROOTDIR_OFFSET failed");
+
+		offset = ROOTDIR_OFFSET;
+
+		/*从根目录区开始遍历，直到数据区起始地址*/
+		while (offset < (DATA_OFFSET))
+		{
+			lseek(fd, offset, SEEK_SET);
+			ret = GetEntry(&entry);
+
+			offset += abs(ret);
+			if (ret > 0 && entry.subdir)
+			{
+				short cur_cluster = entry.FirstCluster;
+				while (1)
+				{
+					if (GetFatCluster(cur_cluster) == 0)
+					{
+						fatbuf[cur_cluster * 2] = 0xff;
+						fatbuf[cur_cluster * 2 + 1] = 0xff;
+						WriteFat();
+					}
+					if (GetFatCluster(cur_cluster) != 0xffff)
+					{
+						cur_cluster = GetFatCluster(cur_cluster);
+					}
+					else
+					{
+						break;
+					}
+				}
+// 				if (curdir == NULL)
+// 					curdir = &entry;
+// 				printf("123\n");
+// 				scan();
+// 				printf("123\n");
+// 				curdir = NULL;
+// 				printf("123\n");
+				struct Entry *cur_back_up = (struct Entry*)malloc(sizeof(struct Entry));
+				if (curdir == NULL)
+				{
+					curdir = (struct Entry*)malloc(sizeof(struct Entry));
+					memcpy(curdir, &entry, sizeof(struct Entry));
+					scan();
+					curdir = NULL;
+				}
+				else
+				{
+					memcpy(cur_back_up, curdir, sizeof(struct Entry));
+					memcpy(curdir, &entry, sizeof(struct Entry));
+					scan();
+					memcpy(curdir, cur_back_up, sizeof(struct Entry));
+				}
+			}
+		}
+	}
+
+	else /*显示子目录*/
+	{
+		//读取目录的所有cluster,而不是只读第一个cluster
+		short cur_cluster = curdir->FirstCluster;
+		//printf("%d\n", curdir->FirstCluster);
+		while (1)
+		{
+
+			cluster_addr = DATA_OFFSET + (cur_cluster - 2) * CLUSTER_SIZE;
+			if ((ret = lseek(fd, cluster_addr, SEEK_SET)) < 0)
+				perror("lseek cluster_addr failed");
+
+			offset = cluster_addr;
+			if (GetFatCluster(cur_cluster) == 0)
+			{
+				fatbuf[cur_cluster * 2] = 0xff;
+				fatbuf[cur_cluster * 2 + 1] = 0xff;
+				WriteFat();
+			}
+			/*读一簇的内容*/
+			while (offset < cluster_addr + CLUSTER_SIZE)
+			{
+				lseek(fd, offset, SEEK_SET);
+				ret = GetEntry(&entry);
+
+				offset += abs(ret);
+
+				if (ret > 0 && entry.subdir == 1)
+				{
+					//printf("%s\n", entry.short_name);
+					short cur_cluster_1 = entry.FirstCluster;
+					while (1)
+					{
+						if (GetFatCluster(cur_cluster_1) == 0)
+						{
+							fatbuf[cur_cluster_1 * 2] = 0xff;
+							fatbuf[cur_cluster_1 * 2 + 1] = 0xff;
+							WriteFat();
+						}
+						if (GetFatCluster(cur_cluster_1) != 0xffff)
+						{
+							cur_cluster_1 = GetFatCluster(cur_cluster_1);
+						}
+						else
+						{
+							break;
+						}
+					}
+					struct Entry *cur_back_up = (struct Entry*)malloc(sizeof(struct Entry));
+					memcpy(cur_back_up, curdir, sizeof(struct Entry));
+					memcpy(curdir, &entry, sizeof(struct Entry));
+					scan();
+					memcpy(curdir, cur_back_up, sizeof(struct Entry));
+				}
+			}
+			// 			printf("%d\n", GetFatCluster(cur_cluster));
+			// 			sleep(5);
+			if (GetFatCluster(cur_cluster) != 0xffff)
+			{
+				cur_cluster = GetFatCluster(cur_cluster);
+			}
+			else
+			{
+				break;
+			}
+		}
+	}
+	return 0;
+}
+
 /*
 *功能：显示当前目录的内容
 *返回值：1，成功；-1，失败
@@ -696,6 +835,19 @@ size，    类型：int，文件的大小
 */
 int fd_cf(char *filename, int size, int is_dir)
 {
+	time_t timep;
+	struct tm *p;
+	time(&timep);
+	p = localtime(&timep);
+	int year = 1900 + p->tm_year;
+	int mouth = 1 + p->tm_mon;
+	int day = p->tm_mday;
+	int hour = p->tm_hour;
+	int min = p->tm_min;
+	int sec = p->tm_sec;
+	short TIME = hour * 2048 + min * 32 + (short)(sec / 2);
+	short DATE = (year - 1980) * 512 + mouth * 32 + day;
+
 	int write_flag = size < 0 ? 1 : 0;
 	unsigned char *stringaddr, inputstring[CLUSTER_SIZE * 10] = { "\0" };
 	unsigned char cin;
@@ -811,6 +963,13 @@ int fd_cf(char *filename, int size, int is_dir)
 						c[11] = 0x01;
 					////////////////////////////////////////////////////////////////////////////
 
+					/*写时间*/
+					c[22] = ((TIME & 0x00ff));
+					c[23] = ((TIME & 0xff00) >> 8);
+					/*写日期*/
+					c[24] = ((DATE & 0x00ff));
+					c[25] = ((DATE & 0xff00) >> 8);
+
 					/*写第一簇的值*/
 					c[26] = (clusterno[0] & 0x00ff);
 					c[27] = ((clusterno[0] & 0xff00) >> 8);
@@ -896,6 +1055,13 @@ int fd_cf(char *filename, int size, int is_dir)
 						else
 							c[11] = 0x01;
 						////////////////////////////////////////////////////////////////////////////
+
+						/*写时间*/
+						c[22] = ((TIME & 0x00ff));
+						c[23] = ((TIME & 0xff00) >> 8);
+						/*写日期*/
+						c[24] = ((DATE & 0x00ff));
+						c[25] = ((DATE & 0xff00) >> 8);
 
 						c[26] = (clusterno[0] & 0x00ff);
 						c[27] = ((clusterno[0] & 0xff00) >> 8);
@@ -1006,6 +1172,13 @@ int fd_cf(char *filename, int size, int is_dir)
 								c[11] = 0x01;
 							////////////////////////////////////////////////////////////////////////////
 
+							/*写时间*/
+							c[22] = ((TIME & 0x00ff));
+							c[23] = ((TIME & 0xff00) >> 8);
+							/*写日期*/
+							c[24] = ((DATE & 0x00ff));
+							c[25] = ((DATE & 0xff00) >> 8);
+
 							c[26] = (clusterno[0] & 0x00ff);
 							c[27] = ((clusterno[0] & 0xff00) >> 8);
 
@@ -1093,7 +1266,7 @@ int main()
 		exit(1);
 	do_usage();					//打印提示信息
 
-
+	scan();
 	while (1)
 	{
 		printf(">");

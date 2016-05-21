@@ -9,6 +9,7 @@
 #define FAT_TWO_OFFSET 512+256*512                       
 #define ROOTDIR_OFFSET 512+256*512+256*512+512                     
 #define DATA_OFFSET 512+256*512+256*512+512*32        
+#include <time.h>
 
            
 
