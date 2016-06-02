@@ -212,13 +212,13 @@ int scan()
 						break;
 					}
 				}
-// 				if (curdir == NULL)
-// 					curdir = &entry;
-// 				printf("123\n");
-// 				scan();
-// 				printf("123\n");
-// 				curdir = NULL;
-// 				printf("123\n");
+				// 				if (curdir == NULL)
+				// 					curdir = &entry;
+				// 				printf("123\n");
+				// 				scan();
+				// 				printf("123\n");
+				// 				curdir = NULL;
+				// 				printf("123\n");
 				struct Entry *cur_back_up = (struct Entry*)malloc(sizeof(struct Entry));
 				if (curdir == NULL)
 				{
@@ -528,9 +528,8 @@ int fd_cd(char *dir)
 		fatbuf[cur_cluster * 2 + 1] = 0xff;
 		WriteFat();
 	}
-	
-	fatherdir[dirno] = curdir;
 	dirno++;
+	fatherdir[dirno] = curdir;
 	curdir = pentry;
 	return 1;
 }
@@ -855,8 +854,8 @@ int fd_cf(char *filename, int size, int is_dir, char *contents)
 	if (!is_dir&&size < 0)
 	{
 		int j = 0;
-		for(j=0;contents[j]!='\0';j++){
-			inputstring[j]=contents[j];
+		for (j = 0; contents[j] != '\0'; j++) {
+			inputstring[j] = contents[j];
 		}
 		size = j;
 
@@ -1231,41 +1230,342 @@ int fd_cf(char *filename, int size, int is_dir, char *contents)
 
 }
 
+
+int fd_cp(char *src, char *dest)
+{
+	int j;
+	struct Entry *pentry;
+	int ret, i = 0, cluster_addr, offset;
+	unsigned short cluster, clusterno[100];
+	unsigned char c[DIR_ENTRY_SIZE];
+	int index, clustersize;
+	unsigned char buf[DIR_ENTRY_SIZE];
+	pentry = (struct Entry*)malloc(sizeof(struct Entry));
+
+	//////////////////////////////////////////////////////////////////////////
+	//找
+	ret = ScanEntry(src, pentry, 0);
+
+	if (ret < 0)
+	{
+		printf("被拷贝文件不存在\n");
+		return -1;
+	}
+	else
+	{
+		//////////////////////////////////////////////////////////////////////////
+		//读文件内容，最长20480
+		char content[20480] = { 0 };
+		char *iter = content;
+
+		short cur_cluster = pentry->FirstCluster;
+		while (1)
+		{
+			cluster_addr = DATA_OFFSET + (cur_cluster - 2) * CLUSTER_SIZE;
+			if ((ret = lseek(fd, cluster_addr, SEEK_SET)) < 0)
+				perror("lseek cluster_addr failed");
+			if (read(fd, iter, CLUSTER_SIZE) < 0)
+				perror("read cluster_addr failed");
+			iter += CLUSTER_SIZE;
+
+			//超过长度限制直接break
+			if (iter - content > 20400)
+				break;
+
+			if (GetFatCluster(cur_cluster) != 0xffff)
+			{
+				cur_cluster = GetFatCluster(cur_cluster);
+			}
+			else
+			{
+				break;
+			}
+		}
+
+
+		//////////////////////////////////////////////////////////////////////////
+		//备份curdir
+		struct Entry* curdir_backup = (struct Entry*)malloc(sizeof(struct Entry));
+		if (curdir == NULL)
+			curdir_backup = NULL;
+		else
+			memcpy(curdir_backup, curdir, sizeof(struct Entry));
+
+
+		//////////////////////////////////////////////////////////////////////////
+		//移动curdir
+
+		//从把dest分为文件名部分和路径部分
+		char tempname[100] = { 0 };
+		char filename_r[100] = { 0 };
+
+		char *p = "\\";
+		for (i = 0, j = strlen(dest) - 1; j >= 0; j--, i++)
+		{
+			if (dest[j] == '\\' || dest[j] == '/')
+			{
+				break;
+			}
+			else
+			{
+				filename_r[i] = dest[j];
+				dest[j] = 0;
+			}
+		}
+
+		//移动curdir
+		if (strlen(dest) != 0)
+		{
+			char *path[10] = { NULL }; //将绝对路径分解
+			int falsemark = 0;
+			int pathNumber = 0;   //绝对路径分成几部分,最后一部分是最终目录
+			struct Entry *tempcurdir = NULL;
+			int tempdirno = 0;
+
+			for (i = 0; i < strlen(dest); i++) {
+				tempname[i] = dest[i];
+			}
+			//name中含有
+			if (strstr(dest, p)) {
+				i = 0;
+				path[i] = strtok(tempname, p);
+				while (path[i] != NULL) {
+					i++;
+					path[i] = strtok(NULL, p);
+				}
+				pathNumber = i;
+
+				//如果第一个目录是根目录下的,就是绝对路径
+				tempcurdir = curdir;
+				tempdirno = dirno;
+				curdir = NULL;
+				ret = ScanEntry(path[0], pentry, 1);
+				//相对路径
+				if (ret < 0) {
+					curdir = tempcurdir;
+					for (i = 0; i < pathNumber; i++) {
+						falsemark = fd_cd(path[i]);
+						if (falsemark < 0) {
+							break;
+						}
+					}
+				}
+				else {
+					dirno = 0;
+					for (i = 0; i < pathNumber; i++) {
+						falsemark = fd_cd(path[i]);
+						if (falsemark < 0) {
+							break;
+						}
+					}
+				}
+				if (falsemark < 0) {
+					curdir = tempcurdir;
+					dirno = tempdirno;
+					falsemark = 0;
+				}
+			}
+			else {
+				fd_cd(dest);
+			}
+		}
+
+
+		//////////////////////////////////////////////////////////////////////////
+		//创建新文件
+		char filename[100] = { 0 };
+		for (int i = 0, j = strlen(filename_r) - 1; j >= 0; i++, j--)
+			filename[i] = filename_r[j];
+		fd_cf(filename, -1, 0, content);
+
+		//////////////////////////////////////////////////////////////////////////
+		//恢复curdir
+		if (curdir_backup == NULL)
+			curdir = NULL;
+		else
+			memcpy(curdir, curdir_backup, sizeof(struct Entry));
+	}
+
+}
+
 void do_usage()
 {
 	printf("please input a command, including followings:\n\tls\t\t\tlist all files\n\tcd <dir>\t\tchange direcotry\n\tcf <filename> <size>\tcreate a file\n\tdf <file>\t\tdelete a file\n\texit\t\t\texit this system\n");
 }
 
-//工作区已经转到当前目录下，传进来的参数是要查看的文件名
-void fd_more(char *filename){
-	printf("%s\n",filename);
+
+int fd_more(char *src)
+{
+
+	int j;
+	struct Entry *pentry;
+	int ret, i = 0, cluster_addr, offset;
+	unsigned short cluster, clusterno[100];
+	unsigned char c[DIR_ENTRY_SIZE];
+	int index, clustersize;
+	unsigned char buf[DIR_ENTRY_SIZE];
+	pentry = (struct Entry*)malloc(sizeof(struct Entry));
+
+	//////////////////////////////////////////////////////////////////////////
+	//备份curdir
+	struct Entry* curdir_backup = (struct Entry*)malloc(sizeof(struct Entry));
+	if (curdir == NULL)
+		curdir_backup = NULL;
+	else
+		memcpy(curdir_backup, curdir, sizeof(struct Entry));
+
+
+	//////////////////////////////////////////////////////////////////////////
+	//移动curdir
+
+	//从把src分为文件名部分和路径部分
+	char tempname[100] = { 0 };
+	char filename_r[100] = { 0 };
+
+	char *p = "\\";
+	for (i = 0, j = strlen(src) - 1; j >= 0; j--, i++)
+	{
+		if (src[j] == '\\' || src[j] == '/')
+		{
+			break;
+		}
+		else
+		{
+			filename_r[i] = src[j];
+			src[j] = 0;
+		}
+	}
+
+	//移动curdir
+	if (strlen(src) != 0)
+	{
+		char *path[10] = { NULL }; //将绝对路径分解
+		int falsemark = 0;
+		int pathNumber = 0;   //绝对路径分成几部分,最后一部分是最终目录
+		struct Entry *tempcurdir = NULL;
+		int tempdirno = 0;
+
+		for (i = 0; i < strlen(src); i++) {
+			tempname[i] = src[i];
+		}
+		//name中含有
+		if (strstr(src, p)) {
+			i = 0;
+			path[i] = strtok(tempname, p);
+			while (path[i] != NULL) {
+				i++;
+				path[i] = strtok(NULL, p);
+			}
+			pathNumber = i;
+
+			//如果第一个目录是根目录下的,就是绝对路径
+			tempcurdir = curdir;
+			tempdirno = dirno;
+			curdir = NULL;
+			ret = ScanEntry(path[0], pentry, 1);
+			//相对路径
+			if (ret < 0) {
+				curdir = tempcurdir;
+				for (i = 0; i < pathNumber; i++) {
+					falsemark = fd_cd(path[i]);
+					if (falsemark < 0) {
+						break;
+					}
+				}
+			}
+			else {
+				dirno = 0;
+				for (i = 0; i < pathNumber; i++) {
+					falsemark = fd_cd(path[i]);
+					if (falsemark < 0) {
+						break;
+					}
+				}
+			}
+			if (falsemark < 0) {
+				curdir = tempcurdir;
+				dirno = tempdirno;
+				falsemark = 0;
+			}
+		}
+		else {
+			fd_cd(src);
+		}
+	}
+
+
+	//////////////////////////////////////////////////////////////////////////
+	//找		
+	char filename[100] = { 0 };
+	for (int i = 0, j = strlen(filename_r) - 1; j >= 0; i++, j--)
+		filename[i] = filename_r[j];
+	ret = ScanEntry(filename, pentry, 0);
+	if (ret < 0)
+	{
+		printf("文件不存在\n");
+		return -1;
+	}
+	else
+	{
+		//////////////////////////////////////////////////////////////////////////
+		//读文件内容，最长20480
+		char content[20480] = { 0 };
+		char *iter = content;
+
+		short cur_cluster = pentry->FirstCluster;
+		while (1)
+		{
+			cluster_addr = DATA_OFFSET + (cur_cluster - 2) * CLUSTER_SIZE;
+			if ((ret = lseek(fd, cluster_addr, SEEK_SET)) < 0)
+				perror("lseek cluster_addr failed");
+			if (read(fd, iter, CLUSTER_SIZE) < 0)
+				perror("read cluster_addr failed");
+			iter += CLUSTER_SIZE;
+
+			//超过长度限制直接break
+			if (iter - content > 20400)
+				break;
+
+			if (GetFatCluster(cur_cluster) != 0xffff)
+			{
+				cur_cluster = GetFatCluster(cur_cluster);
+			}
+			else
+			{
+				break;
+			}
+		}
+
+		printf("%s\n", content);
+
+		//////////////////////////////////////////////////////////////////////////
+		//恢复curdir
+		if (curdir_backup == NULL)
+			curdir = NULL;
+		else
+			memcpy(curdir, curdir_backup, sizeof(struct Entry));
+	}
 }
 
-//filename 当前工作目录下需要复制的文件名
-//newPath  新的路径
-void fd_cp(char *filename,char *newPath){
-	printf("%s\n",filename);
+void fd_mv(char *filename, char *newPath) {
+	printf("%s\n", filename);
 }
 
-void fd_mv(char *filename,char *newPath){
-	printf("%s\n",filename);
-}
-
-void fd_find(char *filename,char *ordername){
+void fd_find(char *filename, char *ordername) {
 
 	int ret = 0;
 	struct Entry *pentry;
 	pentry = (struct Entry*)malloc(sizeof(struct Entry));
 	ret = ScanEntry(filename, pentry, 0);
-	if(ret<0){
+	if (ret < 0) {
 		printf("文件%s不存在\n", filename);
 		return;
 	}
 
-	if(ordername[0] == 'd'){
-		fd_df(filename,0);
+	if (ordername[0] == 'd') {
+		fd_df(filename, 0);
 	}
-	else if(ordername[0] == 'm'){
+	else if (ordername[0] == 'm') {
 		fd_more(filename);
 	}
 }
@@ -1278,7 +1578,7 @@ int main()
 	char order[20];
 	char newpath[20];
 
-	char contents[1024]={0};
+	char contents[20480] = { 0 };
 
 	/***************************************绝对路径和多层目录需要用到的*********************************/
 	char tempname[20];  //strtok函数会把name给改了,所以要来个副本
@@ -1307,8 +1607,8 @@ int main()
 	scan();
 	while (1)
 	{
-		for(i=0;contents[i]!='\0';i++){
-			contents[i]='\0';
+		for (i = 0; contents[i] != '\0'; i++) {
+			contents[i] = '\0';
 			break;
 		}
 
@@ -1321,6 +1621,16 @@ int main()
 			fd_ls();
 		else if (strcmp(input, "cd") == 0)
 		{
+			if (curdir != NULL)
+			{
+				tempcurdir = (struct Entry*)malloc(sizeof(struct Entry));
+				memcpy(tempcurdir, curdir, sizeof(struct Entry));
+			}
+			else
+			{
+				tempcurdir = NULL;
+			}
+
 			scanf("%s", name);
 			for (i = 0; i < 20; i++) {
 				tempname[i] = name[i];
@@ -1336,7 +1646,7 @@ int main()
 				pathNumber = i;
 
 				//如果第一个目录是根目录下的,就是绝对路径
-				tempcurdir = curdir;
+				//tempcurdir = curdir;
 				tempdirno = dirno;
 				curdir = NULL;
 				ret = ScanEntry(path[0], pentry, 1);
@@ -1345,7 +1655,7 @@ int main()
 					curdir = tempcurdir;
 					for (i = 0; i < pathNumber; i++) {
 						falsemark = fd_cd(path[i]);
-						if(falsemark < 0){
+						if (falsemark < 0) {
 							break;
 						}
 					}
@@ -1354,12 +1664,12 @@ int main()
 					dirno = 0;
 					for (i = 0; i < pathNumber; i++) {
 						falsemark = fd_cd(path[i]);
-						if(falsemark < 0){
+						if (falsemark < 0) {
 							break;
 						}
 					}
 				}
-				if(falsemark <0){
+				if (falsemark < 0) {
 					curdir = tempcurdir;
 					dirno = tempdirno;
 					falsemark = 0;
@@ -1392,7 +1702,7 @@ int main()
 			scanf("%s", name);
 			scanf("%s", input);
 			size = atoi(input);
-			if(size == -1){
+			if (size == -1) {
 				scanf("%s", contents);
 			}
 			fd_cf(name, size, 0, contents);
@@ -1403,79 +1713,46 @@ int main()
 
 			fd_cf(name, 0, 1, contents);
 		}
-/******************************************************************************************/
-		else if(strcmp(input, "pwd") == 0){
+		/******************************************************************************************/
+		else if (strcmp(input, "pwd") == 0) {
 			printf("Root_dir");
-			for(i=1;i<dirno;i++){
+			for (i = 1; i < dirno; i++) {
 				printf("/");
-				printf("%s",fatherdir[i]->short_name);
+				printf("%s", fatherdir[i]->short_name);
 			}
 			printf("/");
-			printf("%s\n",curdir->short_name);
+			if (curdir == NULL)
+				printf("\n");
+			else
+				printf("%s\n", curdir->short_name);
 		}
-		else if(strcmp(input, "more") == 0){
-			scanf("%s", name);
-			for (i = 0; i < 20; i++) {
-				tempname[i] = name[i];
-			}
-			//name中含有
-			if (strstr(name, p)) {
-				i = 0;
-				path[i] = strtok(tempname, p);
-				while (path[i] != NULL) {
-					i++;
-					path[i] = strtok(NULL, p);
-				}
-				pathNumber = i;
+		else if (strcmp(input, "more") == 0) {
 
-				//如果第一个目录是根目录下的,就是绝对路径
-				tempcurdir = curdir;
-				tempdirno = dirno;
-				curdir = NULL;
-				ret = ScanEntry(path[0], pentry, 1);
-				//相对路径
-				if (ret < 0) {
-					curdir = tempcurdir;
-					for (i = 0; i < pathNumber-1; i++) {
-						falsemark = fd_cd(path[i]);
-						if(falsemark < 0){
-							break;
-						}
-					}
-					if(falsemark == 0){
-						fd_more(path[i]);
-					}
-				}
-				else {
-					dirno = 0;
-					for (i = 0; i < pathNumber-1; i++) {
-						falsemark = fd_cd(path[i]);
-						if(falsemark < 0){
-							break;
-						}
-					}
-					if(falsemark == 0){
-						fd_more(path[i]);
-					}
-				}
-				if(falsemark <0){
-					curdir = tempcurdir;
-					dirno = tempdirno;
-					falsemark = 0;
-				}
-			}
-			else {
-				fd_more(name);
-			}
+			scanf("%s", name);
+			fd_more(name);
 		}
-		else if(strcmp(input, "cp") == 0){
+		else if (strcmp(input, "cp") == 0) {
 			scanf("%s", name);
 			scanf("%s", newpath);
+			fd_cp(name, newpath);
 		}
-		else if(strcmp(input, "mv") == 0){
+		else if (strcmp(input, "mv") == 0) {
+			scanf("%s", name);
+			scanf("%s", newpath);
+			fd_cp(name, newpath);
+			fd_df(name, 0);
 
 		}
-		else if(strcmp(input, "find") == 0){
+		else if (strcmp(input, "find") == 0) {
+			if (curdir != NULL)
+			{
+				tempcurdir = (struct Entry*)malloc(sizeof(struct Entry));
+				memcpy(tempcurdir, curdir, sizeof(struct Entry));
+			}
+			else
+			{
+				tempcurdir = NULL;
+			}
 			scanf("%s", name);
 			scanf("%s", order);
 			for (i = 0; i < 20; i++) {
@@ -1492,53 +1769,50 @@ int main()
 				pathNumber = i;
 
 				//如果第一个目录是根目录下的,就是绝对路径
-				tempcurdir = curdir;
+				//tempcurdir = curdir;
 				tempdirno = dirno;
 				curdir = NULL;
 				ret = ScanEntry(path[0], pentry, 1);
 				//相对路径
 				if (ret < 0) {
 					curdir = tempcurdir;
-					for (i = 0; i < pathNumber-1; i++) {
+					for (i = 0; i < pathNumber - 1; i++) {
 						falsemark = fd_cd(path[i]);
-						if(falsemark < 0){
+						if (falsemark < 0) {
 							break;
 						}
 					}
-					if(falsemark == 0){
-						fd_find(path[i],order);
+					if (falsemark == 0) {
+						fd_find(path[i], order);
 					}
-					
+
 				}
 				else {
 					dirno = 0;
-					for (i = 0; i < pathNumber-1; i++) {
+					for (i = 0; i < pathNumber - 1; i++) {
 						falsemark = fd_cd(path[i]);
-						if(falsemark < 0){
+						if (falsemark < 0) {
 							break;
 						}
 					}
-					if(falsemark == 0){
-						fd_find(path[i],order);
+					if (falsemark == 0) {
+						fd_find(path[i], order);
 					}
 				}
-				if(falsemark <0){
+				if (falsemark < 0) {
 					curdir = tempcurdir;
 					dirno = tempdirno;
 					falsemark = 0;
 				}
 			}
 			else {
-				fd_find(name,order);
+				fd_find(name, order);
 			}
 		}
-/******************************************************************************************/
+		/******************************************************************************************/
 		else
 			do_usage();
 	}
 
 	return 0;
 }
-
-
-

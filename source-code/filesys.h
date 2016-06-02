@@ -11,7 +11,7 @@
 #define DATA_OFFSET 512+256*512+256*512+512*32        
 #include <time.h>
 
-           
+
 
 /*属性位掩码*/
 #define ATTR_READONLY 0x01
@@ -31,7 +31,7 @@
 #define MASK_MONTH 0x01e0
 #define MASK_DAY 0x001f
 
-struct BootDescriptor_t{
+struct BootDescriptor_t {
 	unsigned char Oem_name[9]; /*0x03-0x0a*/
 	int BytesPerSector;        /*0x0b-0x0c*/
 	int SectorsPerCluster;     /*0x0d*/
@@ -46,45 +46,45 @@ struct BootDescriptor_t{
 	int HiddenSectors;         /*0x1c-0x1d*/
 };
 
-struct Entry{
+struct Entry {
 	unsigned char short_name[12];   /*字节0-10，11字节的短文件名*/
 	unsigned char long_name[27];    /*未使用，26字节的长文件名*/
-	unsigned short year,month,day;  /*22-23字节*/
-	unsigned short hour,min,sec;    /*24-25字节*/
+	unsigned short year, month, day;  /*22-23字节*/
+	unsigned short hour, min, sec;    /*24-25字节*/
 	unsigned short FirstCluster;    /*26-27字节*/
 	unsigned int size;              /*28-31字节*/
-	/*属性值                        11字节
-	*7  6  5  4  3  2  1  0
-	*N  N  A  D  V  S  H  R         N未使用
-	*/
+									/*属性值                        11字节
+									*7  6  5  4  3  2  1  0
+									*N  N  A  D  V  S  H  R         N未使用
+									*/
 
-	unsigned char readonly:1;
-	unsigned char hidden:1;
-	unsigned char system:1;
-	unsigned char vlabel:1;
-	unsigned char subdir:1;
-	unsigned char archive:1;
+	unsigned char readonly : 1;
+	unsigned char hidden : 1;
+	unsigned char system : 1;
+	unsigned char vlabel : 1;
+	unsigned char subdir : 1;
+	unsigned char archive : 1;
 };
 
 int fd_ls();
 int fd_cd(char *dir);
-int fd_df(char *file_name,int is_dir);
-int fd_cf(char *file_name,int size,int is_dir,char *contents);
+int fd_df(char *file_name, int is_dir);
+int fd_cf(char *file_name, int size, int is_dir, char *contents);
 
 void findDate(unsigned short *year,
-			  unsigned short *month,
-			  unsigned short *day,
-			  unsigned char info[2]);
+	unsigned short *month,
+	unsigned short *day,
+	unsigned char info[2]);
 
 void findTime(unsigned short *hour,
-			  unsigned short *min,
-			  unsigned short *sec,
-			  unsigned char info[2]);
+	unsigned short *min,
+	unsigned short *sec,
+	unsigned char info[2]);
 int ReadFat();
 int WriteFat();
 void ScanBootSector();
 void ScanRootEntry();
-int ScanEntry(char *entryname,struct Entry *pentry,int mode);
+int ScanEntry(char *entryname, struct Entry *pentry, int mode);
 int GetEntry(struct Entry *entry);
 void FileNameFormat(unsigned char *name);
 unsigned short GetFatCluster(unsigned short prev);
@@ -96,7 +96,7 @@ struct Entry *curdir = NULL;
 int dirno = 0;/*代表目录的层数*/
 struct Entry* fatherdir[10];
 
-unsigned char fatbuf[512*250];  
+unsigned char fatbuf[512 * 250];
 
 #endif
 
